@@ -3,7 +3,7 @@
 // Tout ce qui est propre au site est dans le fichier .ktec, jamais dans le programme :
 //   « pdrtec.requete »  → la requête du rapport de recherche (une ligne par caractéristique de pièce)
 //   « pdrtec.reglages » → adresse du serveur des photos, modèle de lien des fichiers, pièces réversibles,
-//                         emplacements supprimés masqués, modèles filtrés par tension
+//                         emplacements supprimés masqués, modèles filtrés par tension, familles proposées
 // La requête s'importe d'un .rptdesign (le rapport BIRT existant) ou se colle dans les paramètres.
 
 import { ErreurHttp } from 'ktec/http.js'
@@ -17,6 +17,7 @@ const REGLAGES_DEFAUT = {
   reversible: false,      // pièces à deux extrémités cherchées dans les deux sens
   masquerSupprimes: false,
   modelesTension: [],     // modèles où « Tension mini / maxi » devient un seul champ « Tension »
+  propositions: true,     // famille et sous-famille proposées (en jaune) aux pièces qui n'en ont pas dans la GMAO
 }
 const LIGNES_MAX = 1_000_000
 

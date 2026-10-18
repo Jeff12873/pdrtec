@@ -88,6 +88,7 @@ const PAGE = `
     <li><b>Trier le tableau</b> : clique sur l'en-tête d'une colonne pour trier (▲/▼), reclique pour inverser le sens.</li>
     <li><b>Voir le détail</b> : clique sur une pièce pour afficher sa photo (si disponible), son emplacement, son observation complète, ses machines, ses pièces jointes et toutes ses caractéristiques. Clique sur une pièce jointe pour l'ouvrir.</li>
     <li><b>Copier un code</b> : clique sur la petite icône à droite du code d'une pièce pour le mettre dans le presse-papier (elle passe à ✓ une fois copié).</li>
+    <li><b>Familles proposées</b> : une pièce sans famille ni sous-famille dans la GMAO reçoit une proposition, <b class="propose">en jaune</b>, d'après les pièces semblables déjà classées (survole-la pour voir pourquoi). Elle sert aux filtres et au tableau ; à reporter dans la GMAO si elle est juste. Se désactive dans Paramètres.</li>
     <li><b>Retirer un filtre</b> : clique sur sa pastille, ou sur « Tout réinitialiser » pour repartir de zéro.</li>
     <li><b>Paramètres</b> : l'adresse du serveur de la GMAO pour afficher les photos, les pièces réversibles (recherche des deux extrémités dans n'importe quel ordre), le masquage des pièces à l'emplacement « SUPPRIME » (signalé en rouge dans le tableau), les modèles filtrés par tension, et la requête qui lit les pièces dans la base. Ils sont gardés dans le fichier de connaissances : les mêmes sur tous les postes.</li>
     <li><b>Mettre à jour les données</b> : « Actualiser depuis la base » relit la base de la GMAO (connexion MySQL de KTEC). Sans connexion : exporte le rapport de recherche de pièces au format Excel, puis glisse le fichier sur la page ou utilise « Charger un export BIRT » (si tu déposes plusieurs fichiers en même temps, un choix te sera proposé).</li>
@@ -114,6 +115,11 @@ const PAGE = `
     <label for="stgReversible">Pièces réversibles</label>
     <label class="stgcheck"><input type="checkbox" id="stgReversible"> Chercher les deux extrémités sans tenir compte de leur ordre</label>
     <p class="note">Un flexible bride SAE ↔ écrou DIN est le même qu'un écrou DIN ↔ bride SAE. Activé, les catégories jumelles d'un modèle (ex. « Embout n°1 » et « Embout n°2 ») sont remplacées par « Un côté » / « L'autre côté », et une pièce est trouvée quel que soit le sens dans lequel elle a été saisie dans la GMAO. L'orientation n'est pas inversée : 90° vu d'un bout peut valoir 270° vu de l'autre.</p>
+  </div>
+  <div class="stgrow">
+    <label for="stgPropositions">Familles proposées</label>
+    <label class="stgcheck"><input type="checkbox" id="stgPropositions"> Proposer une famille et une sous-famille aux pièces qui n'en ont pas</label>
+    <p class="note">PDRTec apprend sur les pièces déjà classées (mots de la désignation, modèle de fiche) et propose la famille et la sous-famille les plus probables aux pièces qui n'en ont pas, quand il en est assez sûr. Les propositions sont <b class="propose">en jaune</b>, servent aux filtres et au tableau, et ne sont jamais écrites dans la GMAO : à reporter dans la GMAO si elles sont justes.</p>
   </div>
   <div class="stgrow">
     <label for="stgHideDeleted">Emplacements supprimés</label>
@@ -168,7 +174,7 @@ let PIECES = [], sel = {}, csel = {}, q = '', Q = []
 // sont cherchées comme une paire sans ordre : côté A + côté B, dans un sens ou dans l'autre.
 let rsel = { A: {}, B: {} }, REV = null
 let lastModel = null, sortKey = 'des', sortIsChar = false, sortDir = 1, tKeyMini = null, tKeyMaxi = null, tensionVal = ''
-let SETTINGS = { serveur: '', modeleLien: '', reversible: false, masquerSupprimes: false, modelesTension: [] }
+let SETTINGS = { serveur: '', modeleLien: '', reversible: false, masquerSupprimes: false, modelesTension: [], propositions: true }
 let requeteReglee = false
 let ecouteDefilement = false
 
@@ -218,8 +224,8 @@ let minuterieReglages
 function saveSettings() {
   clearTimeout(minuterieReglages)
   minuterieReglages = setTimeout(() => {
-    const { serveur, modeleLien, reversible, masquerSupprimes, modelesTension } = SETTINGS
-    api('/api/reglages', { methode: 'POST', corps: { serveur, modeleLien, reversible, masquerSupprimes, modelesTension } }).catch(() => {})
+    const { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions } = SETTINGS
+    api('/api/reglages', { methode: 'POST', corps: { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions } }).catch(() => {})
   }, 400)
 }
 
@@ -311,11 +317,115 @@ function fromAOA(aoa, label) {
   })
   PIECES = [...map.values()]
   PIECES.forEach((p) => { const pr = emplParts(p.empl); p.deleted = pr.length > 0 && pr.every(isDeletedEmpl) })
-  PIECES.forEach((p) => (p.__t = norm([p.code, p.des, p.empl, p.obs, p.obsMachine, p.modele, p.famille, p.sousfamille, ...Object.values(p.car)].join(' | ')).replace(/\s+/g, ' ')))
+  PIECES.forEach((p) => { p.familleGmao = p.famille; p.sousfamilleGmao = p.sousfamille })
+  proposerFamilles()
+  appliquerPropositions()
   const nMod = new Set(PIECES.map((p) => p.modele)).size
-  $('source').textContent = `${PIECES.length} pièces · ${nMod} modèles de fiche` + (stamp ? ` · extraction du ${stamp}` : '') + (label ? ` · ${label}` : '')
+  const nProp = PIECES.filter((p) => p.prop).length
+  $('source').textContent = `${PIECES.length} pièces · ${nMod} modèles de fiche` + (nProp ? ` · ${nProp} famille${nProp > 1 ? 's' : ''} proposée${nProp > 1 ? 's' : ''}` : '') + (stamp ? ` · extraction du ${stamp}` : '') + (label ? ` · ${label}` : '')
   sel = {}; csel = {}; rsel = { A: {}, B: {} }; q = ''; Q = []; $('q').value = ''; lastModel = null
   render()
+}
+
+// ---------------------------------------------------------------- familles proposées
+
+// Une pièce sans famille ou sans sous-famille dans la GMAO reçoit la plus probable d'après les pièces déjà
+// classées (« bayésien naïf » : les mots de la désignation, et le modèle de fiche technique). Rien n'est proposé
+// en dessous de SEUIL de confiance, ni sur la seule foi d'une marque ou d'une référence (voir solide).
+// Les propositions ne sont jamais écrites dans la GMAO.
+const SEUIL = 0.6
+
+// Une proposition solide : assez sûre, et fondée sur la nature de la pièce ou son modèle de fiche (une marque comme
+// « Telemecanique » se retrouve dans des familles très différentes). Une seule pièce exemple suffit si la nature
+// ET le modèle concordent ; sinon il en faut deux.
+const solide = (x) => x && x.confiance >= SEUIL && (x.nature || x.modele) && (x.pieces >= 2 || (x.nature && x.modele))
+const MOTS_VIDES = new Set(['de', 'du', 'la', 'le', 'les', 'des', 'et', 'en', 'pour', 'avec', 'sur', 'a', 'x'])
+
+function motsDe(p) {
+  const mots = norm(p.des).split(/[^a-z0-9]+/).filter((m) => m.length >= 2 && /[a-z]/.test(m) && !MOTS_VIDES.has(m))
+  // Le début de chaque mot aussi (« detect » rapproche « detecteur » et « detection »).
+  const debuts = mots.filter((m) => m.length > 4).map((m) => '~' + m.slice(0, 4))
+  // Le premier mot dit ce qu'est la pièce (DETECT, CONNECTEUR, RLT…) et le modèle de fiche aussi : ils comptent
+  // triple, plus que la marque ou les références.
+  const nature = mots.length ? Array(2).fill('^' + mots[0].slice(0, 6)) : []
+  const modele = p.modele && p.modele !== NA ? Array(3).fill('#' + norm(p.modele)) : []
+  return [...mots, ...debuts, ...nature, ...modele]
+}
+
+// exemples : [{ classe, mots }] → classer(mots) = { classe, confiance, raisons }
+function apprendre(exemples) {
+  const classes = new Map()
+  const vocabulaire = new Set()
+  for (const { classe, mots } of exemples) {
+    if (!classes.has(classe)) classes.set(classe, { pieces: 0, total: 0, mots: new Map() })
+    const c = classes.get(classe)
+    c.pieces++
+    for (const m of mots) {
+      c.mots.set(m, (c.mots.get(m) || 0) + 1)
+      c.total++
+      vocabulaire.add(m)
+    }
+  }
+  const V = vocabulaire.size || 1
+  return (mots) => {
+    const connus = mots.filter((m) => vocabulaire.has(m))
+    if (!connus.length || !classes.size) return null
+    const scores = [...classes].map(([classe, c]) => [classe, Math.log(c.pieces / exemples.length) + connus.reduce((s, m) => s + Math.log(((c.mots.get(m) || 0) + 1) / (c.total + V)), 0)])
+    const max = Math.max(...scores.map(([, v]) => v))
+    const somme = scores.reduce((s, [, v]) => s + Math.exp(v - max), 0)
+    const [classe, score] = scores.sort((a, b) => b[1] - a[1])[0]
+    const c = classes.get(classe)
+    const raisons = [...new Set(connus.filter((m) => c.mots.has(m)).map((m) => m.replace(/^[~#^]/, '')))].slice(0, 4)
+    // Ce qui fonde la proposition : la nature de la pièce (premier mot) et son modèle de fiche, partagés avec la classe ?
+    const nature = mots.some((m) => m.startsWith('^') && c.mots.has(m))
+    const modele = mots.some((m) => m.startsWith('#') && c.mots.has(m))
+    return { classe, confiance: Math.exp(score - max) / somme, pieces: c.pieces, raisons, nature, modele }
+  }
+}
+
+function proposerFamilles() {
+  const connue = (v) => v && v !== NA
+  const classees = PIECES.filter((p) => connue(p.familleGmao))
+  const parFamille = apprendre(classees.map((p) => ({ classe: p.familleGmao, mots: motsDe(p) })))
+  const sousFamilles = new Map() // famille → classeur des sous-familles
+  for (const p of PIECES) {
+    p.prop = null
+    if (connue(p.familleGmao) && connue(p.sousfamilleGmao)) continue
+    const mots = motsDe(p)
+    let famille = { classe: p.familleGmao, confiance: 1, gmao: true }
+    if (!connue(p.familleGmao)) {
+      const f = parFamille(mots)
+      if (!solide(f)) continue
+      famille = f
+    }
+    if (!sousFamilles.has(famille.classe)) {
+      sousFamilles.set(famille.classe, apprendre(PIECES.filter((x) => x.familleGmao === famille.classe && connue(x.sousfamilleGmao)).map((x) => ({ classe: x.sousfamilleGmao, mots: motsDe(x) }))))
+    }
+    const sf = sousFamilles.get(famille.classe)(mots)
+    p.prop = {
+      famille: famille.gmao ? null : famille,
+      sousfamille: solide(sf) ? sf : null,
+    }
+    if (!p.prop.famille && !p.prop.sousfamille) p.prop = null
+  }
+}
+
+// Avec les propositions (Paramètres) : elles prennent la place des champs vides, pour les filtres et le tableau.
+function appliquerPropositions() {
+  const actives = SETTINGS.propositions !== false
+  for (const p of PIECES) {
+    const f = actives && p.prop?.famille, sf = actives && p.prop?.sousfamille
+    p.famille = f ? f.classe : p.familleGmao
+    p.sousfamille = sf ? sf.classe : p.sousfamilleGmao
+    p.propose = f || sf ? { famille: Boolean(f), sousfamille: Boolean(sf) } : null
+    p.__t = norm([p.code, p.des, p.empl, p.obs, p.obsMachine, p.modele, p.famille, p.sousfamille, ...Object.values(p.car)].join(' | ')).replace(/\s+/g, ' ')
+  }
+}
+
+function explicationProposition(p, k) {
+  const x = p.prop?.[k] || p.prop?.famille || p.prop?.sousfamille
+  if (!x) return ''
+  return `Proposée par PDRTec (${Math.round(x.confiance * 100)} %), comme ${x.pieces} pièce${x.pieces > 1 ? 's' : ''} classée${x.pieces > 1 ? 's' : ''} ainsi${x.raisons.length ? ` : ${x.raisons.join(', ')}` : ''}`
 }
 
 // ---------------------------------------------------------------- filtres et tableau
@@ -444,8 +554,10 @@ function render() {
     render()
   }))
   const n = cols.length + chars.length, cell = (v) => (v && v !== NA ? esc(v) : '<span class="na">—</span>')
+  // Famille ou sous-famille proposée par PDRTec (absente de la GMAO) : en jaune, avec la raison au survol.
+  const cellClasse = (p, k) => (p.propose?.[k] ? `<span class="propose" title="${esc(explicationProposition(p, k))}">${esc(p[k])}</span>` : cell(p[k]))
   $('tbody').innerHTML = res.length ? res.slice(0, 500).map((p, i) =>
-    `<tr class="row" tabindex="0" data-i="${i}"><td class="code"><span class="caret">›</span>${esc(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button></td><td class="des">${esc(p.des)}</td><td class="empl">${emplHtml(p.empl)}</td><td>${cell(p.famille)}</td><td>${cell(p.sousfamille)}</td>${chars.map((c) => `<td>${cell(p.car[c])}</td>`).join('')}</tr>`
+    `<tr class="row" tabindex="0" data-i="${i}"><td class="code"><span class="caret">›</span>${esc(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button></td><td class="des">${esc(p.des)}</td><td class="empl">${emplHtml(p.empl)}</td><td>${cellClasse(p, 'famille')}</td><td>${cellClasse(p, 'sousfamille')}</td>${chars.map((c) => `<td>${cell(p.car[c])}</td>`).join('')}</tr>`
     + `<tr class="detail" hidden><td colspan="${n}">${detail(p)}</td></tr>`).join('')
     : PIECES.length ? `<tr><td class="empty" colspan="${n}">Aucune pièce ne correspond. Retire un filtre pour élargir.</td></tr>`
       : `<tr><td class="empty" colspan="${n}">Aucune donnée chargée. « Actualiser depuis la base », ou glisse un export Excel du rapport ici.</td></tr>`
@@ -539,7 +651,10 @@ function detail(p) {
     return c.length ? `<a class="pjitem" href="${esc(c[0])}" target="_blank" rel="noopener" title="Ouvrir la pièce jointe"><img src="${esc(c[0])}" alt="Pièce jointe" loading="lazy" data-next="${esc(c.slice(1).join('|'))}" onload="this.parentNode.href=this.src" onerror="pdrtec.pjErr(this)"></a>`
       : `<span class="pjitem doc" title="${esc(h)}">Document</span>`
   }).join('')
-  const obs = `<div class="obs">${p.empl ? `<div class="k">Emplacement</div><div>${emplHtml(p.empl)}</div>` : ''}<div class="k">Observation</div>${lines.length ? lines.map((l) => `<div>${esc(l)}</div>`).join('') : '<div class="na">Aucune observation</div>'}`
+  const proposition = p.propose?.famille || p.propose?.sousfamille
+    ? `<div class="k">Classement proposé (absent de la GMAO)</div><div><span class="propose">${esc(p.famille)} › ${esc(p.sousfamille)}</span></div><div class="note">${esc(explicationProposition(p, p.propose.sousfamille ? 'sousfamille' : 'famille'))}. À reporter dans la GMAO si c'est juste.</div>`
+    : ''
+  const obs = `<div class="obs">${proposition}${p.empl ? `<div class="k">Emplacement</div><div>${emplHtml(p.empl)}</div>` : ''}<div class="k">Observation</div>${lines.length ? lines.map((l) => `<div>${esc(l)}</div>`).join('') : '<div class="na">Aucune observation</div>'}`
     + (omLines.length ? `<div class="k">Observation machine</div>${omLines.map(omLine).join('')}` : '')
     + (p.pj.length ? `<div class="k">Pièces jointes (${p.pj.length})</div><div class="pjlist">${pjs}</div>` : '')
     + `<div class="k">Caractéristiques</div>${kv.length ? carGroups(p, kv) : '<div class="na">Aucune</div>'}</div>`
@@ -623,6 +738,7 @@ function ouvrirParametres() {
   $('stgLien').value = SETTINGS.modeleLien
   $('stgReversible').checked = !!SETTINGS.reversible
   $('stgHideDeleted').checked = !!SETTINGS.masquerSupprimes
+  $('stgPropositions').checked = SETTINGS.propositions !== false
   renderSettingsModels()
   $('settings').showModal()
 }
@@ -662,6 +778,7 @@ function brancherEvenements() {
   $('stgLien').oninput = () => { SETTINGS.modeleLien = $('stgLien').value.trim(); saveSettings(); render() }
   $('stgReversible').onchange = () => { SETTINGS.reversible = $('stgReversible').checked; rsel = { A: {}, B: {} }; saveSettings(); render() }
   $('stgHideDeleted').onchange = () => { SETTINGS.masquerSupprimes = $('stgHideDeleted').checked; saveSettings(); render() }
+  $('stgPropositions').onchange = () => { SETTINGS.propositions = $('stgPropositions').checked; appliquerPropositions(); sel = {}; csel = {}; saveSettings(); render() }
   $('stgRequeteOk').onclick = () => enregistrerRequete(() => api('/api/requete', { methode: 'POST', corps: { sql: $('stgRequete').value } }))
   $('stgRptdesign').onchange = (e) => {
     const fichier = e.target.files[0]

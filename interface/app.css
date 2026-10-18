@@ -111,6 +111,10 @@
 .pdrtec .btn.small { font-size: .8rem; padding: 6px 12px; color: var(--accent); border-color: var(--accent-soft); background: var(--accent-soft); }
 .pdrtec .bandeau-source { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
 
+/* Famille ou sous-famille proposée par PDRTec (absente de la GMAO) */
+.pdrtec .propose, .pdrtec-dialog .propose { color: #facc15; background: rgba(250, 204, 21, .12); border-radius: 6px; padding: 1px 6px; font-weight: 600; cursor: help; }
+.pdrtec .obs .note { margin-top: 2px; }
+
 /* Fenêtres (notice, paramètres, choix de fichier) */
 .pdrtec-dialog { border: 1px solid var(--bord); border-radius: 20px; background: var(--carte); color: var(--texte); padding: 22px; max-width: min(680px, calc(100vw - 32px)); box-sizing: border-box; font-size: 15px; line-height: 1.5; }
 .pdrtec-dialog::backdrop { background: rgba(5, 10, 7, .6); }
