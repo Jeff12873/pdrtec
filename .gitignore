@@ -1,0 +1,15 @@
+# Liste blanche : seuls les fichiers du programme sont publiés.
+# Tout autre fichier déposé ici (exports de la GMAO, rapports, fichier .ktec…) reste sur le poste.
+/*
+!/.github/
+!/.gitignore
+!/app.json
+!/blocs/
+!/docs/
+!/interface/
+!/README.md
+!/VERSION
+!/package.json
+
+*.ktec
+*.birtec

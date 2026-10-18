@@ -1,0 +1,47 @@
+# À chaque envoi sur « main » : fabrique pdrtec.zip (l'application seule) et le publie dans les Releases GitHub.
+# C'est ce paquet que l'installateur KTEC télécharge ; le socle commun (serveur, IA, Java, BIRT) vient de KTEC.
+
+name: Publier
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publier:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Vérification du code
+        run: |
+          for fichier in $(git ls-files '*.js' | grep -v vendor/); do node --check "$fichier"; done
+
+      - name: pdrtec.zip
+        run: |
+          version="$(cat VERSION).${{ github.run_number }}"
+          echo "$version" > VERSION
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          mkdir -p dist/pdrtec
+          cp -r app.json blocs interface VERSION package.json README.md dist/pdrtec/
+          (cd dist && zip -qr pdrtec.zip pdrtec)
+
+      - name: Release
+        env:
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          gh release create "v$VERSION" dist/pdrtec.zip --title "PDRTec $VERSION" --notes "${NOTES:-Nouvelle version}"
+          # On garde les 3 dernières versions
+          gh release list --limit 100 --json tagName --jq '.[3:][].tagName' | while read -r ancienne; do
+            gh release delete "$ancienne" --yes --cleanup-tag
+          done

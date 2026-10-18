@@ -1,0 +1,13 @@
+<h1>Rechercher une pièce</h1>
+<p>PDRTec (la « Recherche PDR du Barbu ») retrouve une pièce de rechange par son code, sa désignation, ses caractéristiques ou son emplacement. Les données viennent <b>directement de la base de la GMAO</b>, par la connexion MySQL de KTEC.</p>
+<h2>Chercher</h2>
+<ul>
+  <li><b>Barre de recherche</b> : code, désignation, référence fabricant, observation. Plusieurs mots se combinent, les accents sont ignorés ; une expression entre guillemets est cherchée telle quelle (<code>"REP 19"</code>).</li>
+  <li><b>Famille puis sous-famille</b> : chaque liste ne propose que les valeurs encore possibles. Le modèle de fiche technique en découle tout seul, et ses caractéristiques deviennent des filtres et des colonnes du tableau.</li>
+  <li><b>Tension</b> : pour les modèles choisis dans les Paramètres, un seul champ remplace « tension mini / maxi » : la page garde les pièces dont la plage couvre la tension tapée.</li>
+  <li><b>Pièces réversibles</b> (Paramètres) : une pièce à deux extrémités (flexible…) est trouvée dans un sens comme dans l'autre.</li>
+</ul>
+<h2>Le détail d'une pièce</h2>
+<p>Un clic sur une ligne montre la photo (agrandie au survol), l'emplacement (« SUPPRIME » en rouge), l'observation, les machines où elle est montée, les pièces jointes et toutes les caractéristiques. L'icône à droite du code le copie.</p>
+<h2>Mettre à jour</h2>
+<p><b>Actualiser depuis la base</b> relit la base de la GMAO. Sans connexion, on peut glisser sur la page un export Excel du rapport BIRT de recherche de pièces : il est lu dans le navigateur et n'est envoyé nulle part.</p>

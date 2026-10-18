@@ -1,0 +1,7 @@
+<h1>Paramètres et requête</h1>
+<p>Les paramètres de PDRTec sont rangés dans le fichier de connaissances <b>.ktec</b> : ils sont les mêmes sur tous les postes qui ouvrent ce fichier. Rien de propre au site n'est dans le programme.</p>
+<h2>Photos et pièces jointes</h2>
+<p>La GMAO range chaque fichier d'après son empreinte. Indiquez l'<b>adresse du serveur</b> de la GMAO et le <b>modèle de lien</b>, avec les repères <code>{serveur}</code>, <code>{empreinte}</code>, <code>{extension}</code> et <code>{e1}</code> à <code>{e4}</code> (1er à 4e caractère de l'empreinte). Sans eux, la chèvre remplace les photos. Les images ne s'affichent que depuis le réseau de l'entreprise.</p>
+<h2>La requête</h2>
+<p>PDRTec lit les pièces avec une requête rangée dans le .ktec : une ligne par caractéristique de pièce, avec au moins les colonnes <code>codePiece</code>, <code>designationPiece</code> et <code>designationLibel</code>. Elle se colle dans les Paramètres, ou se lit directement dans le rapport BIRT existant (« La lire dans un rapport BIRT ») : seul le texte de la requête est gardé, jamais la connexion ni un mot de passe éventuel du rapport.</p>
+<p>Colonnes reconnues : codePiece, designationPiece, observationPiece, modeleFichetechnique, categorieDico, designationLibel, valeurLibel, designationFamille, designationSousfamille, emplacementPiece, observationMachine, lienPhoto, extensionPhoto, piecesJointes, extensionPiecesJointes.</p>

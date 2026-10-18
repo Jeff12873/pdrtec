@@ -1,0 +1,6 @@
+{
+  "name": "pdrtec",
+  "private": true,
+  "type": "module",
+  "description": "PDRTec, application KTEC : recherche de pièces de rechange sur la base de la GMAO. Lancée par le portail KTEC."
+}

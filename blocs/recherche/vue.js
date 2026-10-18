@@ -1,0 +1,723 @@
+// PDRTec : la recherche de pièces de rechange (ex « Recherche PDR du Barbu »).
+//
+// Les données viennent de la base de la GMAO, par la requête rangée dans le fichier .ktec (une ligne par
+// caractéristique de pièce, regroupées ici par code pièce). En secours, sans connexion : un export Excel du
+// même rapport BIRT, glissé sur la page (lu dans le navigateur, envoyé nulle part).
+// Les réglages (serveur des photos, pièces réversibles…) sont aussi dans le .ktec : les mêmes sur tous les postes.
+
+import { api } from '/socle/api.js'
+import { etat } from '/socle/etat.js'
+import { demanderMotDePasse } from '/socle/connexion.js'
+import { notifier } from '/socle/ui.js'
+
+export default {
+  chemin: 'recherche',
+  titre: 'Recherche',
+  icone: 'loupe',
+  menu: true,
+  aide: 'pdrtec',
+
+  async afficher(zone) {
+    zone.innerHTML = PAGE
+    await demarrer(zone)
+  },
+}
+
+const PAGE = `
+<div class="pdrtec" id="app">
+  <div class="logo" id="logo" aria-hidden="true">
+    <svg viewBox="0 0 80 80" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20.5,38 C19,20 28,8 40,8 C52,8 61,20 59.5,38"/>
+      <path d="M20.5,32 C15.5,31 15,40 20.5,41 M59.5,32 C64.5,31 65,40 59.5,41"/>
+      <path d="M28,15 C31,12.5 34,11.5 37,11.3" stroke-width="2"/>
+      <circle cx="32" cy="32" r="6" stroke-width="2"/><circle cx="48" cy="32" r="6" stroke-width="2"/>
+      <path d="M38,31.5 Q40,29.8 42,31.5 M26,31 L20.5,30 M54,31 L59.5,30" stroke-width="2"/>
+      <circle cx="32" cy="32.5" r="1.8" fill="currentColor" stroke="none"/><circle cx="48" cy="32.5" r="1.8" fill="currentColor" stroke="none"/>
+      <path d="M40,36 L38.5,41 L41,41.5" stroke-width="1.8"/>
+      <path fill="currentColor" stroke="none" d="M20.5,38 C22,44 26,46 30,45 C33,44 36,44.5 40,45.5 C44,44.5 47,44 50,45 C54,46 58,44 59.5,38 C61,54 56,66 48,71 C45,74 42,77 40,78 C38,77 35,74 32,71 C24,66 19,54 20.5,38Z"/>
+      <path d="M31,48.5 C34,51 37.5,50.5 40,48.5 C42.5,50.5 46,51 49,48.5" stroke-width="1.8" style="stroke:var(--bg)"/>
+      <path d="M36.5,55 Q40,57 43.5,55" stroke-width="1.8" style="stroke:var(--bg)"/>
+    </svg>
+  </div>
+  <header>
+    <div>
+      <div class="titlerow">
+        <h1 id="title">Recherche PDR du Barbu</h1>
+        <button class="btn small" id="help" type="button">Notice d'utilisation de l'outil</button>
+      </div>
+      <p class="sub" id="source"></p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="reset" type="button">Tout réinitialiser</button>
+      <button class="btn primary" id="actualiser" type="button">Actualiser depuis la base</button>
+      <label class="btn" for="file">Charger un export BIRT</label>
+      <input type="file" id="file" accept=".xls,.xlsx,.csv" multiple hidden>
+      <button class="btn" id="settingsBtn" type="button">Paramètres</button>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Code, désignation, référence fabricant, observation…" autocomplete="off">
+    </div>
+    <div class="filters" id="filters"></div>
+    <div class="group" id="chargroup">
+      <h2 id="chartitle"></h2>
+      <div class="filters" id="charfilters"></div>
+    </div>
+    <div class="bar">
+      <div class="chips" id="chips"></div>
+      <div class="count" id="count"></div>
+    </div>
+  </section>
+
+  <div class="tablebox"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  <p class="note">Clique sur une pièce pour voir son observation et toutes ses caractéristiques. Les données viennent directement de la base de la GMAO (« Actualiser depuis la base ») ; sans connexion, glisse un export Excel du rapport sur la page : il est lu dans ton navigateur et n'est envoyé nulle part.</p>
+</div>
+
+<dialog id="notice" class="pdrtec-dialog" aria-labelledby="noticeTitle">
+  <div class="dhead">
+    <h2 id="noticeTitle">Notice d'utilisation de l'outil</h2>
+    <button class="btn small" id="closeNotice" type="button">Fermer</button>
+  </div>
+  <ol>
+    <li><b>Rechercher</b> : tape un code, une désignation ou une référence fabricant dans la barre. Plusieurs mots se combinent (ex. « detect 24 »), les accents sont ignorés. Mets une expression entre guillemets pour la chercher telle quelle : <code>"REP 19"</code> trouve « REP 19 » mais pas « REP 190 » ni « REP 2 … 19 ».</li>
+    <li><b>Filtrer en cascade</b> : choisis une famille puis une sous-famille. Chaque liste ne propose que les valeurs encore possibles. Le modèle de fiche technique se détermine automatiquement à partir de la sous-famille, il n'y a rien à choisir.</li>
+    <li><b>Filtrer sur les caractéristiques</b> : une fois la sous-famille choisie, ses caractéristiques (tension, diamètre…) apparaissent en dessous et deviennent des colonnes du tableau. Pour les modèles activés dans Paramètres, un champ Tension unique remplace les bornes mini/maxi.</li>
+    <li><b>Trier le tableau</b> : clique sur l'en-tête d'une colonne pour trier (▲/▼), reclique pour inverser le sens.</li>
+    <li><b>Voir le détail</b> : clique sur une pièce pour afficher sa photo (si disponible), son emplacement, son observation complète, ses machines, ses pièces jointes et toutes ses caractéristiques. Clique sur une pièce jointe pour l'ouvrir.</li>
+    <li><b>Copier un code</b> : clique sur la petite icône à droite du code d'une pièce pour le mettre dans le presse-papier (elle passe à ✓ une fois copié).</li>
+    <li><b>Retirer un filtre</b> : clique sur sa pastille, ou sur « Tout réinitialiser » pour repartir de zéro.</li>
+    <li><b>Paramètres</b> : l'adresse du serveur de la GMAO pour afficher les photos, les pièces réversibles (recherche des deux extrémités dans n'importe quel ordre), le masquage des pièces à l'emplacement « SUPPRIME » (signalé en rouge dans le tableau), les modèles filtrés par tension, et la requête qui lit les pièces dans la base. Ils sont gardés dans le fichier de connaissances : les mêmes sur tous les postes.</li>
+    <li><b>Mettre à jour les données</b> : « Actualiser depuis la base » relit la base de la GMAO (connexion MySQL de KTEC). Sans connexion : exporte le rapport de recherche de pièces au format Excel, puis glisse le fichier sur la page ou utilise « Charger un export BIRT » (si tu déposes plusieurs fichiers en même temps, un choix te sera proposé).</li>
+  </ol>
+  <p class="note">« (non renseigné) » signale un champ vide dans la base. Les « ? » dans certaines observations d'un export Excel sont des accents perdus lors de l'export BIRT.</p>
+</dialog>
+
+<dialog id="settings" class="pdrtec-dialog" aria-labelledby="settingsTitle">
+  <div class="dhead">
+    <h2 id="settingsTitle">Paramètres</h2>
+    <button class="btn small" id="closeSettings" type="button">Fermer</button>
+  </div>
+  <div class="stgrow">
+    <label for="stgServer">Adresse du serveur (photos de la GMAO)</label>
+    <input type="text" id="stgServer" class="stginput" placeholder="ex : 10.0.0.5 ou http://mon-serveur" autocomplete="off">
+    <p class="note">Adresse du serveur de la GMAO où sont stockées les photos et pièces jointes. La page s'en sert pour reconstruire le lien de chaque fichier à partir de son empreinte. Si elle est vide ou fausse, les photos sont remplacées par la chèvre (ou le fromage). Les images ne s'affichent que sur un poste du réseau de l'entreprise.</p>
+  </div>
+  <div class="stgrow">
+    <label for="stgLien">Modèle de lien des fichiers</label>
+    <input type="text" id="stgLien" class="stginput" placeholder="{serveur}/dossier/{e1}/{e2}/{empreinte}.{extension}" autocomplete="off">
+    <p class="note">Où la GMAO range un fichier d'après son empreinte : <code>{serveur}</code> (l'adresse ci-dessus), <code>{empreinte}</code>, <code>{extension}</code>, et <code>{e1}</code> à <code>{e4}</code> pour les 1er à 4e caractères de l'empreinte.</p>
+  </div>
+  <div class="stgrow">
+    <label for="stgReversible">Pièces réversibles</label>
+    <label class="stgcheck"><input type="checkbox" id="stgReversible"> Chercher les deux extrémités sans tenir compte de leur ordre</label>
+    <p class="note">Un flexible bride SAE ↔ écrou DIN est le même qu'un écrou DIN ↔ bride SAE. Activé, les catégories jumelles d'un modèle (ex. « Embout n°1 » et « Embout n°2 ») sont remplacées par « Un côté » / « L'autre côté », et une pièce est trouvée quel que soit le sens dans lequel elle a été saisie dans la GMAO. L'orientation n'est pas inversée : 90° vu d'un bout peut valoir 270° vu de l'autre.</p>
+  </div>
+  <div class="stgrow">
+    <label for="stgHideDeleted">Emplacements supprimés</label>
+    <label class="stgcheck"><input type="checkbox" id="stgHideDeleted"> Masquer les pièces dont l'emplacement est « SUPPRIME »</label>
+    <p class="note">Décoché, ces pièces restent visibles et leur emplacement est signalé par une étiquette rouge. Coché, elles disparaissent du tableau et des listes de filtres ; le compteur indique combien sont masquées. Une pièce rangée à plusieurs endroits n'est masquée que si tous ses emplacements sont supprimés.</p>
+  </div>
+  <div class="stgrow">
+    <label>Modèles avec tension mini/maxi</label>
+    <p class="note">Pour les modèles cochés, les deux filtres « Tension mini » et « Tension maxi » sont remplacés par un seul champ « Tension » : tape la tension de ton installation (ex. 24) et la page garde les pièces dont la plage mini–maxi la couvre. Seuls les modèles qui ont ces deux caractéristiques sont proposés ; la liste dépend des données chargées.</p>
+    <div class="chklist" id="stgModels"></div>
+  </div>
+  <div class="stgrow">
+    <label for="stgRequete">Requête de recherche (base de la GMAO)</label>
+    <textarea id="stgRequete" class="stginput" spellcheck="false" placeholder="SELECT … AS codePiece, … AS designationPiece, … AS designationLibel, … AS valeurLibel …"></textarea>
+    <p class="note">Une ligne par caractéristique de pièce, avec au moins les colonnes codePiece, designationPiece et designationLibel (et, si possible : observationPiece, modeleFichetechnique, valeurLibel, designationFamille, designationSousfamille, categorieDico, emplacementPiece, observationMachine, lienPhoto, extensionPhoto, piecesJointes, extensionPiecesJointes).</p>
+    <div class="actions" style="justify-content:flex-start">
+      <button class="btn small" id="stgRequeteOk" type="button">Enregistrer la requête</button>
+      <label class="btn small" for="stgRptdesign">La lire dans un rapport BIRT (.rptdesign)</label>
+      <input type="file" id="stgRptdesign" accept=".rptdesign" hidden>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="filechoice" class="pdrtec-dialog" aria-labelledby="filechoiceTitle">
+  <div class="dhead">
+    <h2 id="filechoiceTitle">Plusieurs fichiers déposés</h2>
+    <button class="btn small" id="closeFilechoice" type="button">Annuler</button>
+  </div>
+  <p class="note">Choisis celui à charger :</p>
+  <div class="chklist" id="filechoiceList"></div>
+</dialog>
+
+<div id="photoPreview" aria-hidden="true"><img alt=""></div>
+`
+
+// ---------------------------------------------------------------- outils
+
+const NA = '(non renseigné)'
+const $ = (id) => document.getElementById(id)
+const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim()
+const isMiniKey = (k) => norm(k).replace(/[^a-z]/g, '') === 'tensionmini'
+const isMaxiKey = (k) => norm(k).replace(/[^a-z]/g, '') === 'tensionmaxi'
+const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>'
+const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>'
+
+// Filtres principaux, dans l'ordre de la cascade
+const MAIN = [['famille', 'Famille'], ['sousfamille', 'Sous-famille']]
+let PIECES = [], sel = {}, csel = {}, q = '', Q = []
+// Pièces réversibles : deux catégories « jumelles » d'un même modèle (mêmes libellés, ex. Embout n°1 / Embout n°2)
+// sont cherchées comme une paire sans ordre : côté A + côté B, dans un sens ou dans l'autre.
+let rsel = { A: {}, B: {} }, REV = null
+let lastModel = null, sortKey = 'des', sortIsChar = false, sortDir = 1, tKeyMini = null, tKeyMaxi = null, tensionVal = ''
+let SETTINGS = { serveur: '', modeleLien: '', reversible: false, masquerSupprimes: false, modelesTension: [] }
+let requeteReglee = false
+let ecouteDefilement = false
+
+// ---------------------------------------------------------------- démarrage de l'écran
+
+async function demarrer() {
+  const lus = await api('/api/reglages')
+  requeteReglee = Boolean(lus.requete)
+  SETTINGS = { ...SETTINGS, ...lus }
+  $('stgRequete').value = lus.requete || ''
+  brancherEvenements()
+  render()
+  chargerDepuisLaBase(false)
+}
+
+// Les données de la base (gardées par le serveur jusqu'au prochain « Actualiser »).
+async function chargerDepuisLaBase(rafraichir) {
+  if (!requeteReglee) {
+    sourceAvecBouton('La requête qui lit les pièces dans la base n’est pas encore réglée.', 'Paramètres', ouvrirParametres)
+    return
+  }
+  if (!etat.connexion?.ouverte) {
+    sourceAvecBouton('Connexion MySQL fermée : connecte-toi pour lire les pièces, ou glisse un export Excel du rapport.', 'Se connecter', async () => {
+      await demanderMotDePasse()
+      if (etat.connexion?.ouverte) chargerDepuisLaBase(false)
+    })
+    return
+  }
+  $('source').textContent = rafraichir ? 'Lecture de la base…' : 'Chargement des pièces…'
+  try {
+    const d = await api(`/api/donnees${rafraichir ? '?rafraichir=1' : ''}`)
+    const date = new Date(d.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+    fromAOA([d.colonnes, ...d.lignes], `base de la GMAO, lue le ${date}${d.tronque ? ' (liste tronquée)' : ''}`)
+  } catch (erreur) {
+    $('source').textContent = erreur.message
+  }
+}
+
+function sourceAvecBouton(texte, bouton, action) {
+  const zone = $('source')
+  zone.innerHTML = `<span class="bandeau-source"><span>${esc(texte)}</span><button class="btn small" type="button">${esc(bouton)}</button></span>`
+  zone.querySelector('button').onclick = action
+}
+
+// Les réglages vont dans le fichier .ktec (regroupés : une écriture par rafale de changements).
+let minuterieReglages
+function saveSettings() {
+  clearTimeout(minuterieReglages)
+  minuterieReglages = setTimeout(() => {
+    const { serveur, modeleLien, reversible, masquerSupprimes, modelesTension } = SETTINGS
+    api('/api/reglages', { methode: 'POST', corps: { serveur, modeleLien, reversible, masquerSupprimes, modelesTension } }).catch(() => {})
+  }, 400)
+}
+
+// ---------------------------------------------------------------- pièces réversibles
+
+function catOfK(k) { for (const p of PIECES) { if (p.modele === sel.modele && p.carCat[k]) return p.carCat[k] } return '' }
+function shortLabelK(k, cat) { const pre = cat + ' :'; return cat && norm(k).startsWith(norm(pre)) ? k.slice(pre.length).trim() : k }
+function twinInfo(chars) {
+  if (!SETTINGS.reversible || !sel.modele) return null
+  const byCat = new Map()
+  chars.forEach((k) => { const c = catOfK(k); if (!c) return; const lb = shortLabelK(k, c); if (!byCat.has(c)) byCat.set(c, new Map()); byCat.get(c).set(norm(lb), { k, label: lb }) })
+  const cats = [...byCat.keys()]
+  for (let i = 0; i < cats.length; i++) for (let j = i + 1; j < cats.length; j++) {
+    const a = byCat.get(cats[i]), b = byCat.get(cats[j])
+    if (a.size && a.size === b.size && [...a.keys()].every((x) => b.has(x))) {
+      return { catA: cats[i], catB: cats[j], labels: [...a.keys()].map((n) => ({ n, label: a.get(n).label, kA: a.get(n).k, kB: b.get(n).k })) }
+    }
+  }
+  return null
+}
+function endOk(p, kf, crit, skipN) { for (const n in crit) { if (n === skipN) continue; const L = REV.labels.find((x) => x.n === n); if (!L || (p.car[L[kf]] ?? '') !== crit[n]) return false } return true }
+// Affectations valides : "12" = embout 1 côté A et embout 2 côté B ; "21" = l'inverse
+function revAssign(p, skip) {
+  const sA = skip && skip.s === 'A' ? skip.n : null, sB = skip && skip.s === 'B' ? skip.n : null, r = []
+  if (endOk(p, 'kA', rsel.A, sA) && endOk(p, 'kB', rsel.B, sB)) r.push('12')
+  if (endOk(p, 'kB', rsel.A, sA) && endOk(p, 'kA', rsel.B, sB)) r.push('21')
+  return r
+}
+const revActive = () => REV && (Object.keys(rsel.A).length || Object.keys(rsel.B).length)
+
+// Recherche : mots libres (tous présents, n'importe où) + "expressions entre guillemets" (exactes, mot entier)
+// ex. "REP 19" trouve « REP 19 » mais ni « REP 190 », ni « PREP 19 », ni « REP 2 … 19 »
+function parseQuery(raw) {
+  const terms = []; const s = norm(raw).replace(/[«»“”„]/g, '"')
+  const re = /"([^"]*)"?|(\S+)/g; let m
+  while ((m = re.exec(s))) {
+    if (m[1] !== undefined) {
+      const ph = m[1].replace(/\s+/g, ' ').trim()
+      if (ph) terms.push({ re: new RegExp('(^|[^a-z0-9])' + ph.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])') })
+    } else terms.push({ w: m[2] })
+  }
+  return terms
+}
+
+// ---------------------------------------------------------------- lecture des données
+
+// Empreinte + extension (colonnes dédiées du rapport) -> « empreinte.extension »
+const withExt = (h, e) => { e = clean(e).replace(/^\.+/, ''); return h && e ? h + '.' + e : h }
+// Les deux listes « ; » sont dans le même ordre (tri par fichier côté SQL) : on les apparie
+function zipExt(hs, es) {
+  const H = String(hs ?? '').split(';').map(clean), E = String(es ?? '').split(';').map(clean)
+  return H.map((h, i) => withExt(h, E[i] || '')).filter(Boolean)
+}
+// Emplacement « SUPPRIME » (accents et casse ignorés). Une pièce n'est « supprimée » que si TOUS ses emplacements le sont.
+const isDeletedEmpl = (e) => norm(e).replace(/[^a-z]/g, '') === 'supprime'
+const emplParts = (e) => String(e ?? '').split(';').map(clean).filter(Boolean)
+function emplHtml(e) {
+  const parts = emplParts(e); if (!parts.length) return '<span class="na">—</span>'
+  return parts.map((x) => (isDeletedEmpl(x) ? `<span class="tag-del">${esc(x)}</span>` : esc(x))).join(' ; ')
+}
+// Le rapport sort une ligne par caractéristique : on regroupe par code pièce
+function fromAOA(aoa, label) {
+  const h = (aoa[0] || []).map((x) => norm(x).replace(/[^a-z]/g, ''))
+  const col = (k) => h.indexOf(k)
+  const C = { code: col('codepiece'), des: col('designationpiece'), obs: col('observationpiece'), mod: col('modelefichetechnique'),
+    lib: col('designationlibel'), val: col('valeurlibel'), fam: col('designationfamille'), sf: col('designationsousfamille'), photo: col('lienphoto'), om: col('observationmachine'), empl: col('emplacementpiece'), pj: col('piecesjointes'), extPhoto: col('extensionphoto'), extPj: col('extensionpiecesjointes'), cat: col('categoriedico') }
+  if (C.code < 0 || C.des < 0 || C.lib < 0) { $('source').textContent = 'Ces données ne ressemblent pas au rapport de recherche de pièces (colonnes codePiece, designationPiece, designationLibel… introuvables).'; return }
+  const map = new Map(); let stamp = ''
+  // Un même libellé peut être rangé dans plusieurs catégories (ex. « Embout n°1 : Type » sous « Embout n°1 » ET « Embout n°2 »).
+  // Dans ce cas la catégorie fait partie de la clé, sinon le 2e écraserait le 1er.
+  const libCats = new Map(), catNames = new Set()
+  // (repérage au sein d'un même modèle : « Tension mini » peut changer de catégorie d'un modèle à l'autre sans être dédoublé)
+  const lk = (mod, lib) => mod + '\u0001' + lib
+  if (C.cat >= 0) aoa.slice(1).forEach((r) => { const l = clean(r[C.lib]), c = clean(r[C.cat]), k = lk(clean(r[C.mod]), l); if (!l || !c) return; catNames.add(norm(c)); if (!libCats.has(k)) libCats.set(k, new Set()); libCats.get(k).add(c) })
+  const carKey = (lib, cat, mod) => {
+    const k = lk(mod, lib)
+    if (!cat || !libCats.has(k) || libCats.get(k).size < 2) return lib
+    // « Embout n°1 : Type » rangé sous « Embout n°2 » -> « Embout n°2 : Type » ; sinon « Catégorie : libellé »
+    const i = lib.indexOf(':')
+    if (i > 0 && catNames.has(norm(lib.slice(0, i).trim()))) return cat + ' : ' + lib.slice(i + 1).trim()
+    return cat + ' : ' + lib
+  }
+  aoa.slice(1).forEach((r) => {
+    const code = clean(r[C.code]), des = clean(r[C.des])
+    if (!des) { if (code && /\d{4}/.test(code) && !stamp) stamp = code; return } // ligne vide ou date d'extraction en pied
+    let p = map.get(code)
+    if (!p) { p = { code, des, obs: String(r[C.obs] ?? '').trim(), obsMachine: String(r[C.om] ?? '').trim(), modele: clean(r[C.mod]) || NA, famille: clean(r[C.fam]) || NA, sousfamille: clean(r[C.sf]) || NA, photo: withExt(clean(r[C.photo]), C.extPhoto >= 0 ? r[C.extPhoto] : ''), empl: C.empl >= 0 ? clean(r[C.empl]) : '', pj: zipExt(C.pj >= 0 ? r[C.pj] : '', C.extPj >= 0 ? r[C.extPj] : ''), car: {}, carCat: {} }; map.set(code, p) }
+    const lib0 = clean(r[C.lib]); if (lib0) { const cg = C.cat >= 0 ? clean(r[C.cat]) : ''; const lib = carKey(lib0, cg, clean(r[C.mod])); const v = clean(r[C.val]); if (!(lib in p.car) || v) p.car[lib] = v; if (cg && !p.carCat[lib]) p.carCat[lib] = cg }
+  })
+  PIECES = [...map.values()]
+  PIECES.forEach((p) => { const pr = emplParts(p.empl); p.deleted = pr.length > 0 && pr.every(isDeletedEmpl) })
+  PIECES.forEach((p) => (p.__t = norm([p.code, p.des, p.empl, p.obs, p.obsMachine, p.modele, p.famille, p.sousfamille, ...Object.values(p.car)].join(' | ')).replace(/\s+/g, ' ')))
+  const nMod = new Set(PIECES.map((p) => p.modele)).size
+  $('source').textContent = `${PIECES.length} pièces · ${nMod} modèles de fiche` + (stamp ? ` · extraction du ${stamp}` : '') + (label ? ` · ${label}` : '')
+  sel = {}; csel = {}; rsel = { A: {}, B: {} }; q = ''; Q = []; $('q').value = ''; lastModel = null
+  render()
+}
+
+// ---------------------------------------------------------------- filtres et tableau
+
+function match(p, skipMain, skipChar) {
+  if (SETTINGS.masquerSupprimes && p.deleted) return false
+  if (Q.length && !Q.every((t) => (t.re ? t.re.test(p.__t) : p.__t.includes(t.w)))) return false
+  for (const k in sel) { if (k !== skipMain && p[k] !== sel[k]) return false }
+  for (const k in csel) { if (k !== skipChar && (p.car[k] ?? '') !== csel[k]) return false }
+  if (revActive() && !revAssign(p, skipChar && typeof skipChar === 'object' ? skipChar : null).length) return false
+  if (tKeyMini && tKeyMaxi && tensionVal !== '') {
+    const val = Number(tensionVal)
+    const mini = p.car[tKeyMini], maxi = p.car[tKeyMaxi]
+    if (!Number.isNaN(val) && (mini !== undefined || maxi !== undefined)) {
+      const nMini = mini ? Number(mini) : -Infinity, nMaxi = maxi ? Number(maxi) : Infinity
+      if (!(val >= nMini && val <= nMaxi)) return false
+    }
+  }
+  return true
+}
+const sortFr = (a, b) => (a === NA ? 1 : b === NA ? -1 : a.localeCompare(b, 'fr', { numeric: true }))
+function options(values, current) {
+  const vals = [...new Set(values)].sort(sortFr)
+  return '<option value="">Tous</option>' + vals.map((v) => `<option value="${esc(v)}"${v === current ? ' selected' : ''}>${esc(v)}</option>`).join('')
+}
+// Caractéristiques du modèle choisi
+function modelChars() {
+  if (!sel.modele) return []
+  const s = new Set(); PIECES.forEach((p) => { if (p.modele === sel.modele) Object.keys(p.car).forEach((k) => s.add(k)) })
+  return [...s]
+}
+function render() {
+  // Le modèle fiche technique n'est jamais choisi à la main : il découle de la seule taxonomie famille/sous-famille
+  // (il ne peut y en avoir qu'un) — indépendamment des filtres de caractéristiques ou de la recherche texte,
+  // pour éviter qu'un filtre transitoire (tension, recherche…) ne fasse disparaître/réapparaître le modèle
+  if (sel.sousfamille) {
+    const opts = [...new Set(PIECES.filter((p) => { for (const k in sel) { if (k !== 'modele' && p[k] !== sel[k]) return false } return true }).map((p) => p.modele))]
+    const auto = opts.length === 1 ? opts[0] : undefined
+    if (sel.modele !== auto) { auto ? (sel.modele = auto) : delete sel.modele; csel = {}; rsel = { A: {}, B: {} } }
+  } else if (sel.modele) { delete sel.modele; csel = {}; rsel = { A: {}, B: {} } }
+  REV = twinInfo(modelChars()); if (!REV) rsel = { A: {}, B: {} }
+
+  // Filtres principaux
+  $('filters').innerHTML = MAIN.map(([k, l]) => `<div class="f"><label for="m_${k}">${l}</label><select id="m_${k}" data-k="${k}" class="${sel[k] ? 'on' : ''}">${options(PIECES.filter((p) => match(p, k)).map((p) => p[k]), sel[k])}</select></div>`).join('')
+  $('filters').querySelectorAll('select').forEach((s) => (s.onchange = () => { const k = s.dataset.k; s.value ? (sel[k] = s.value) : delete sel[k]; render() }))
+  // Caractéristiques : n'apparaissent qu'une fois le modèle déterminé
+  const chars = modelChars()
+  $('chartitle').innerHTML = sel.modele ? (chars.length ? `Caractéristiques · <b>${esc(sel.modele)}</b>` : `Aucune caractéristique renseignée pour <b>${esc(sel.modele)}</b>`) : 'Choisis une sous-famille pour filtrer sur ses caractéristiques'
+
+  // Modèle activé dans Paramètres avec tension mini/maxi renseignée : un seul champ « Tension » remplace les deux pastilles
+  const tensionOn = !!(sel.modele && SETTINGS.modelesTension.includes(sel.modele))
+  tKeyMini = tensionOn ? chars.find(isMiniKey) : null
+  tKeyMaxi = tensionOn ? chars.find(isMaxiKey) : null
+  const tensionMode = !!(tKeyMini && tKeyMaxi)
+  if (!tensionMode) tensionVal = ''
+  else { delete csel[tKeyMini]; delete csel[tKeyMaxi] }
+  const twinKeys = new Set(REV ? REV.labels.flatMap((L) => [L.kA, L.kB]) : [])
+  twinKeys.forEach((k) => delete csel[k])
+  const filterChars = (tensionMode ? chars.filter((k) => k !== tKeyMini && k !== tKeyMaxi) : chars).filter((k) => !twinKeys.has(k))
+
+  const focusOnTension = document.activeElement && document.activeElement.id === 'tension'
+    ? { start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null
+  // Filtres regroupés par catégorie du dictionnaire ; le préfixe « Catégorie : » est retiré du libellé dans son groupe
+  const catOf = catOfK, shortLabel = shortLabelK
+  const tensionHtml = tensionMode ? `<div class="f"><label for="tension" title="Tension">Tension</label><input id="tension" type="text" inputmode="decimal" autocomplete="off" placeholder="ex : 24" value="${esc(tensionVal)}" class="tensioninput${tensionVal !== '' ? ' on' : ''}"></div>` : ''
+  const tensionCat = tensionMode ? catOf(tKeyMini) : ''
+  const fGroups = new Map()
+  filterChars.forEach((k) => { const c = catOf(k); if (!fGroups.has(c)) fGroups.set(c, []); fGroups.get(c).push(k) })
+  if (tensionMode && !fGroups.has(tensionCat)) fGroups.set(tensionCat, [])
+  let fi = 0
+  const groupHtml = (cat, keys) => keys.map((k) => {
+    const i = fi++
+    const vals = PIECES.filter((p) => match(p, null, k)).map((p) => p.car[k]).filter((v) => v)
+    return `<div class="f"><label for="c_${i}" title="${esc(k)}">${esc(shortLabel(k, cat))}</label><select id="c_${i}" data-k="${esc(k)}" class="${csel[k] ? 'on' : ''}">${options(vals, csel[k])}</select></div>`
+  }).join('') + (tensionMode && cat === tensionCat ? tensionHtml : '')
+  const onlyNoCat = fGroups.size <= 1 && (fGroups.size === 0 || fGroups.has(''))
+  // Côtés A / B (pièces réversibles) : valeurs possibles calculées dans les deux sens
+  const revVals = (sd, n) => {
+    const out = []
+    PIECES.filter((p) => match(p, null, { s: sd, n })).forEach((p) => revAssign(p, { s: sd, n }).forEach((a) => {
+      const L = REV.labels.find((x) => x.n === n); const kf = (sd === 'A') === (a === '12') ? 'kA' : 'kB'; const v = p.car[L[kf]]; if (v) out.push(v)
+    }))
+    return out
+  }
+  const revHtml = REV ? ['A', 'B'].map((sd) => `<div class="fgroup"><div class="kcat">${sd === 'A' ? 'Un côté' : "L'autre côté"}<span class="revnote">⇄ ${esc(REV.catA)} ou ${esc(REV.catB)}</span></div><div class="filters">${REV.labels.map((L) => {
+    const i = fi++
+    return `<div class="f"><label for="c_${i}" title="${esc(L.label)}">${esc(L.label)}</label><select id="c_${i}" data-rs="${sd}" data-rn="${esc(L.n)}" class="${rsel[sd][L.n] ? 'on' : ''}">${options(revVals(sd, L.n), rsel[sd][L.n])}</select></div>`
+  }).join('')}</div></div>`).join('') : ''
+  $('charfilters').innerHTML = (onlyNoCat ? groupHtml('', fGroups.get('') || [])
+    : [...fGroups].map(([cat, keys]) => `<div class="fgroup"><div class="kcat">${esc(cat || 'Autres')}</div><div class="filters">${groupHtml(cat, keys)}</div></div>`).join('')) + revHtml
+  $('charfilters').querySelectorAll('select[data-k]').forEach((s) => (s.onchange = () => { const k = s.dataset.k; s.value ? (csel[k] = s.value) : delete csel[k]; render() }))
+  $('charfilters').querySelectorAll('select[data-rs]').forEach((s) => (s.onchange = () => { const sd = s.dataset.rs, n = s.dataset.rn; s.value ? (rsel[sd][n] = s.value) : delete rsel[sd][n]; render() }))
+  const tIn = $('tension')
+  if (tIn) {
+    let tT; tIn.oninput = () => { clearTimeout(tT); const v = tIn.value; tT = setTimeout(() => { tensionVal = v.trim(); render() }, 150) }
+    if (focusOnTension) { tIn.focus(); try { tIn.setSelectionRange(focusOnTension.start, focusOnTension.end) } catch {} }
+  }
+  if (sel.modele !== lastModel) { lastModel = sel.modele; const cf = $('charfilters'); cf.classList.remove('fade'); void cf.offsetWidth; cf.classList.add('fade') }
+
+  // Pastilles des filtres actifs
+  const chips = [...MAIN.filter(([k]) => sel[k]).map(([k, l]) => ({ t: 'm', k, l, v: sel[k] })), ...Object.keys(csel).map((k) => ({ t: 'c', k, l: k, v: csel[k] })),
+    ...(tensionMode && tensionVal !== '' ? [{ t: 't', k: 'tension', l: 'Tension', v: tensionVal + ' V' }] : []),
+    ...(REV ? ['A', 'B'].flatMap((sd) => Object.keys(rsel[sd]).map((n) => { const L = REV.labels.find((x) => x.n === n); return { t: 'r', s: sd, n, l: (sd === 'A' ? 'Un côté' : "L'autre côté") + ' · ' + (L ? L.label : n), v: rsel[sd][n] } })) : [])]
+  $('chips').innerHTML = chips.map((c, i) => `<button class="chip" type="button" data-i="${i}" title="${esc(c.l)}">${esc(c.v)}<span>✕</span></button>`).join('')
+  $('chips').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { const c = chips[b.dataset.i]; if (c.t === 'm') delete sel[c.k]; else if (c.t === 't') tensionVal = ''; else if (c.t === 'r') delete rsel[c.s][c.n]; else delete csel[c.k]; render() }))
+
+  // Tableau, triable en cliquant sur une colonne (pastille ▲▼ = colonne active)
+  if (sortIsChar && !chars.includes(sortKey)) { sortKey = 'des'; sortIsChar = false; sortDir = 1 }
+  const res = PIECES.filter((p) => match(p)).sort((a, b) => {
+    const va = sortIsChar ? a.car[sortKey] : a[sortKey], vb = sortIsChar ? b.car[sortKey] : b[sortKey]
+    const ea = va == null || va === '' || va === NA, eb = vb == null || vb === '' || vb === NA
+    if (ea && eb) return 0; if (ea) return 1; if (eb) return -1
+    return sortDir * String(va).localeCompare(String(vb), 'fr', { numeric: true })
+  })
+  const nHidden = SETTINGS.masquerSupprimes ? PIECES.filter((p) => p.deleted).length : 0
+  $('count').innerHTML = `<b>${res.length}</b> / ${PIECES.length - nHidden} pièces` + (nHidden ? ` · ${nHidden} supprimée${nHidden > 1 ? 's' : ''} masquée${nHidden > 1 ? 's' : ''}` : '')
+  const cols = [['code', 'Code'], ['des', 'Désignation'], ['empl', 'Emplacement'], ['famille', 'Famille'], ['sousfamille', 'Sous-famille']]
+  const th = (key, label, isChar) => {
+    const on = sortIsChar === isChar && sortKey === key
+    return `<th class="${isChar ? 'char' : ''}" data-key="${esc(key)}" data-char="${isChar ? 1 : 0}">${esc(label)}${on ? (sortDir === 1 ? ' ▲' : ' ▼') : ''}</th>`
+  }
+  $('thead').innerHTML = '<tr>' + cols.map(([k, l]) => th(k, l, false)).join('') + chars.map((c) => th(c, c, true)).join('') + '</tr>'
+  $('thead').querySelectorAll('th[data-key]').forEach((t) => (t.onclick = () => {
+    const key = t.dataset.key, isChar = t.dataset.char === '1'
+    if (sortKey === key && sortIsChar === isChar) sortDir *= -1; else { sortKey = key; sortIsChar = isChar; sortDir = 1 }
+    render()
+  }))
+  const n = cols.length + chars.length, cell = (v) => (v && v !== NA ? esc(v) : '<span class="na">—</span>')
+  $('tbody').innerHTML = res.length ? res.slice(0, 500).map((p, i) =>
+    `<tr class="row" tabindex="0" data-i="${i}"><td class="code"><span class="caret">›</span>${esc(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button></td><td class="des">${esc(p.des)}</td><td class="empl">${emplHtml(p.empl)}</td><td>${cell(p.famille)}</td><td>${cell(p.sousfamille)}</td>${chars.map((c) => `<td>${cell(p.car[c])}</td>`).join('')}</tr>`
+    + `<tr class="detail" hidden><td colspan="${n}">${detail(p)}</td></tr>`).join('')
+    : PIECES.length ? `<tr><td class="empty" colspan="${n}">Aucune pièce ne correspond. Retire un filtre pour élargir.</td></tr>`
+      : `<tr><td class="empty" colspan="${n}">Aucune donnée chargée. « Actualiser depuis la base », ou glisse un export Excel du rapport ici.</td></tr>`
+  if (res.length > 500) $('tbody').insertAdjacentHTML('beforeend', `<tr><td class="empty" colspan="${n}">500 premières pièces affichées · affine la recherche</td></tr>`)
+  $('tbody').querySelectorAll('.cpy').forEach((b) => { b.onclick = (e) => { e.stopPropagation(); copyCode(b) }; b.onkeydown = (e) => e.stopPropagation() })
+  $('tbody').querySelectorAll('tr.row').forEach((tr) => { const t = () => { tr.classList.toggle('open'); tr.nextElementSibling.hidden = !tr.classList.contains('open') }; tr.onclick = t; tr.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t() } } })
+}
+
+// ---------------------------------------------------------------- photos et pièces jointes
+
+// Le lien d'un fichier de la GMAO, reconstruit à partir de son empreinte avec le modèle des paramètres.
+function photoUrl(hash) {
+  if (!hash || !SETTINGS.serveur || !SETTINGS.modeleLien) return null
+  const srv = SETTINGS.serveur.trim().replace(/\/+$/, '')
+  if (!srv) return null
+  const base = /^https?:\/\//i.test(srv) ? srv : 'http://' + srv
+  const m = String(hash).match(/^([^.]+)(?:\.([a-z0-9]+))?$/i); if (!m) return null
+  const h = m[1].toLowerCase(), ext = m[2] || 'png'
+  const valeurs = { serveur: base, empreinte: h, extension: ext, e1: h[0], e2: h[1], e3: h[2], e4: h[3] }
+  return SETTINGS.modeleLien.replace(/\{(\w+)\}/g, (tout, nom) => (nom in valeurs ? valeurs[nom] : tout))
+}
+// Images : on essaie l'extension annoncée, puis ses variantes de casse, puis les formats courants.
+// Couvre les exports sans colonne d'extension, les .jpeg/.jpg et les serveurs sensibles à la casse.
+const IMG_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']
+function photoCandidates(hash) {
+  if (!hash) return []
+  const m = String(hash).match(/^([^.]+)(?:\.([a-z0-9]+))?$/i); if (!m) return []
+  const exts = []
+  const add = (e) => { if (e && !exts.includes(e)) exts.push(e) }
+  if (m[2]) { add(m[2]); add(m[2].toLowerCase()); add(m[2].toUpperCase()) }
+  IMG_EXTS.forEach((e) => add(e)); IMG_EXTS.forEach((e) => add(e.toUpperCase()))
+  return exts.map((e) => photoUrl(m[1] + '.' + e)).filter(Boolean)
+}
+// Erreur de chargement : on passe à l'extension suivante ; quand tout a échoué, on appelle le repli
+function tryNextImg(img, onFail) {
+  const rest = (img.dataset.next || '').split('|').filter(Boolean)
+  if (rest.length) { img.dataset.next = rest.slice(1).join('|'); img.src = rest[0]; return }
+  onFail(img)
+}
+function pjFail(img) { const a = img.parentNode; a.classList.add('doc'); img.replaceWith('Document') }
+// Émoji natif plutôt qu'une icône dessinée à la main. Une fois sur deux, la chèvre laisse place à un fromage de chèvre.
+// Tirage refait à chaque ouverture de la page, mais stable pour une pièce donnée (sinon l'icône changerait à chaque filtre)
+const GOAT_SEED = Math.floor(Math.random() * 1e9)
+const goatHash = (t) => [...String(t)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, GOAT_SEED)
+function goatHtml(code) {
+  return goatHash(code) % 2
+    ? '<span class="goat" role="img" aria-label="fromage de chèvre">🧀</span><span class="sadlabel">Pas de photo</span>'
+    : '<span class="goat" role="img" aria-label="chèvre">🐐</span><span class="sadlabel">Pas de photo</span>'
+}
+function goatFail(img) { const box = img.closest('.photobox'); if (box) { box.classList.add('empty'); box.innerHTML = goatHtml(img.dataset.code) } }
+// Appelées par les attributs onerror des images (le tableau est écrit en HTML).
+window.pdrtec = { photoErr: (img) => tryNextImg(img, goatFail), pjErr: (img) => tryNextImg(img, pjFail) }
+function photoBox(p) {
+  const c = photoCandidates(p.photo), url = c[0]
+  return url ? `<div class="photobox"><img src="${esc(url)}" alt="Photo de la pièce" loading="lazy" data-code="${esc(p.code)}" data-next="${esc(c.slice(1).join('|'))}" onerror="pdrtec.photoErr(this)"></div>`
+    : `<div class="photobox empty">${goatHtml(p.code)}</div>`
+}
+// observationMachine vient d'une agrégation (plusieurs lignes liées jointes par " ; ") :
+// entrées vides et doublons littéraux fréquents, à nettoyer avant affichage
+function splitObsMachine(s) {
+  const seen = new Set()
+  // le « # » est un remplissage saisi dans la GMAO quand il n'y a pas d'observation
+  return String(s ?? '').split(';').map(clean)
+    .map((l) => l.replace(/\s*:\s*#\s*$/, '').replace(/:\s*#\s+/, ': '))
+    .filter(Boolean).filter((l) => { const k = norm(l); if (seen.has(k)) return false; seen.add(k); return true })
+}
+// Observation machine : ce qui suit le premier « : » (l'observation elle-même) est surligné
+function omLine(l) {
+  const i = l.indexOf(':')
+  if (i < 0 || !l.slice(i + 1).trim()) return `<div>${esc(l)}</div>`
+  return `<div>${esc(l.slice(0, i + 1))} <mark class="hl">${esc(l.slice(i + 1).trim())}</mark></div>`
+}
+// Caractéristiques regroupées par catégorie du dictionnaire (ordre d'apparition dans les données)
+function carGroups(p, kv) {
+  const chip = ([k, v]) => `<span>${esc(k)} : <b>${v ? esc(v) : '<span class="na">vide</span>'}</b></span>`
+  const groups = new Map()
+  kv.forEach((e) => { const g = p.carCat[e[0]] || ''; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(e) })
+  if (groups.size === 1 && groups.has('')) return `<div class="kv">${kv.map(chip).join('')}</div>`
+  return [...groups].map(([g, list]) => `<div class="kcat">${esc(g || 'Sans catégorie')}</div><div class="kv">${list.map(chip).join('')}</div>`).join('')
+}
+function detail(p) {
+  // Les " / " du rapport sont des retours à la ligne
+  const lines = p.obs.replace(/^[*/\s]+/, '').split(/\s\/\s?/).map(clean).filter(Boolean)
+  const omLines = splitObsMachine(p.obsMachine)
+  const kv = Object.entries(p.car)
+  const pjs = p.pj.map((h) => {
+    const u = photoUrl(h)
+    const isImg = !/\.[a-z0-9]+$/i.test(h) || /\.(png|jpe?g|gif|bmp|webp)$/i.test(h)
+    if (u && !isImg) { const ext = (h.match(/\.([a-z0-9]+)$/i) || [, ''])[1]; return `<a class="pjitem doc" href="${esc(u)}" target="_blank" rel="noopener" title="Ouvrir le document">${esc(ext || 'Document')}</a>` }
+    const c = photoCandidates(h)
+    return c.length ? `<a class="pjitem" href="${esc(c[0])}" target="_blank" rel="noopener" title="Ouvrir la pièce jointe"><img src="${esc(c[0])}" alt="Pièce jointe" loading="lazy" data-next="${esc(c.slice(1).join('|'))}" onload="this.parentNode.href=this.src" onerror="pdrtec.pjErr(this)"></a>`
+      : `<span class="pjitem doc" title="${esc(h)}">Document</span>`
+  }).join('')
+  const obs = `<div class="obs">${p.empl ? `<div class="k">Emplacement</div><div>${emplHtml(p.empl)}</div>` : ''}<div class="k">Observation</div>${lines.length ? lines.map((l) => `<div>${esc(l)}</div>`).join('') : '<div class="na">Aucune observation</div>'}`
+    + (omLines.length ? `<div class="k">Observation machine</div>${omLines.map(omLine).join('')}` : '')
+    + (p.pj.length ? `<div class="k">Pièces jointes (${p.pj.length})</div><div class="pjlist">${pjs}</div>` : '')
+    + `<div class="k">Caractéristiques</div>${kv.length ? carGroups(p, kv) : '<div class="na">Aucune</div>'}</div>`
+  return `<div class="detailgrid">${photoBox(p)}${obs}</div>`
+}
+
+// Copier le code PDR : icône à côté du code, ✓ pendant un instant une fois copié
+function copyCode(btn) {
+  const code = btn.dataset.code
+  const done = (ok) => {
+    btn.innerHTML = ok ? ICON_OK : ICON_COPY; btn.classList.toggle('ok', ok); btn.title = ok ? 'Copié !' : 'Copie impossible'
+    clearTimeout(btn._t); btn._t = setTimeout(() => { btn.innerHTML = ICON_COPY; btn.classList.remove('ok'); btn.title = 'Copier le code' }, 1200)
+  }
+  const fallback = () => {
+    const ta = document.createElement('textarea'); ta.value = code; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select()
+    let ok = false; try { ok = document.execCommand('copy') } catch {} ta.remove(); done(ok)
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(() => done(true), fallback); else fallback()
+}
+
+// ---------------------------------------------------------------- export Excel (secours, sans connexion)
+
+// SheetJS n'est chargé qu'au premier fichier (embarqué avec PDRTec : pas besoin d'Internet).
+let sheetjs = null
+function chargerSheetJS() {
+  sheetjs ??= new Promise((ok, echec) => {
+    const script = document.createElement('script')
+    script.src = new URL('../../interface/vendor/xlsx.full.min.js', import.meta.url).href
+    script.onload = () => ok(window.XLSX)
+    script.onerror = () => echec(new Error('Lecteur Excel introuvable'))
+    document.head.append(script)
+  })
+  return sheetjs
+}
+function readFile(f) {
+  const fr = new FileReader()
+  fr.onload = async (e) => {
+    try {
+      const XLSX = await chargerSheetJS()
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' })
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' })
+      fromAOA(aoa, f.name)
+    } catch { $('source').textContent = 'Impossible de lire ce fichier. Réexporte le rapport BIRT au format Excel et réessaie.' }
+  }
+  fr.readAsArrayBuffer(f)
+}
+// Un seul fichier : chargement direct. Plusieurs : on demande lequel.
+function handleFiles(files) {
+  if (!files || !files.length) return
+  if (files.length === 1) { readFile(files[0]); return }
+  const list = [...files], fcDlg = $('filechoice')
+  $('filechoiceList').innerHTML = list.map((f, i) => `<button class="btn" type="button" data-i="${i}">${esc(f.name)}</button>`).join('')
+  $('filechoiceList').querySelectorAll('button').forEach((b) => (b.onclick = () => { fcDlg.close(); readFile(list[b.dataset.i]) }))
+  fcDlg.showModal()
+}
+
+// ---------------------------------------------------------------- paramètres
+
+// Un modèle n'est proposé que s'il a, sur au moins une de ses pièces, une caractéristique Tension mini ET Tension maxi
+function modelHasTensionRange(modele) {
+  let hasMini = false, hasMaxi = false
+  for (const p of PIECES) {
+    if (p.modele !== modele) continue
+    for (const k in p.car) { if (!hasMini && isMiniKey(k)) hasMini = true; if (!hasMaxi && isMaxiKey(k)) hasMaxi = true }
+    if (hasMini && hasMaxi) return true
+  }
+  return false
+}
+function renderSettingsModels() {
+  const models = [...new Set(PIECES.map((p) => p.modele))].filter((m) => m && m !== NA && modelHasTensionRange(m)).sort(sortFr)
+  $('stgModels').innerHTML = models.length ? models.map((m) => `<label><input type="checkbox" data-m="${esc(m)}"${SETTINGS.modelesTension.includes(m) ? ' checked' : ''}> ${esc(m)}</label>`).join('') : '<p class="na">Aucun modèle avec tension mini/maxi dans les données chargées</p>'
+  $('stgModels').querySelectorAll('input[type=checkbox]').forEach((cb) => (cb.onchange = () => {
+    const m = cb.dataset.m
+    if (cb.checked) { if (!SETTINGS.modelesTension.includes(m)) SETTINGS.modelesTension = [...SETTINGS.modelesTension, m] }
+    else SETTINGS.modelesTension = SETTINGS.modelesTension.filter((x) => x !== m)
+    saveSettings(); render()
+  }))
+}
+function ouvrirParametres() {
+  $('stgServer').value = SETTINGS.serveur
+  $('stgLien').value = SETTINGS.modeleLien
+  $('stgReversible').checked = !!SETTINGS.reversible
+  $('stgHideDeleted').checked = !!SETTINGS.masquerSupprimes
+  renderSettingsModels()
+  $('settings').showModal()
+}
+async function enregistrerRequete(envoi) {
+  try {
+    const r = await envoi()
+    $('stgRequete').value = r.requete
+    requeteReglee = true
+    $('settings').close()
+    chargerDepuisLaBase(true)
+  } catch (erreur) {
+    notifier(erreur.message, 'erreur')
+  }
+}
+
+// ---------------------------------------------------------------- évènements
+
+function brancherEvenements() {
+  let t; $('q').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { q = e.target.value.trim(); Q = parseQuery(q); render() }, 120) }
+  $('reset').onclick = () => { sel = {}; csel = {}; rsel = { A: {}, B: {} }; q = ''; Q = []; $('q').value = ''; render() }
+  $('actualiser').onclick = () => chargerDepuisLaBase(true)
+  $('file').onchange = (e) => handleFiles(e.target.files)
+  const app = $('app')
+  app.ondragover = (e) => { e.preventDefault(); app.classList.add('drop') }
+  app.ondragleave = (e) => { if (!app.contains(e.relatedTarget)) app.classList.remove('drop') }
+  app.ondrop = (e) => { e.preventDefault(); app.classList.remove('drop'); handleFiles(e.dataTransfer.files) }
+
+  // Fenêtres : fermeture par le bouton ou par un clic à côté.
+  for (const [id, bouton] of [['notice', 'closeNotice'], ['settings', 'closeSettings'], ['filechoice', 'closeFilechoice']]) {
+    const dlg = $(id)
+    $(bouton).onclick = () => dlg.close()
+    dlg.onclick = (e) => { if (e.target === dlg) dlg.close() }
+  }
+  $('help').onclick = () => $('notice').showModal()
+  $('settingsBtn').onclick = ouvrirParametres
+  $('stgServer').oninput = () => { SETTINGS.serveur = $('stgServer').value.trim(); saveSettings(); render() }
+  $('stgLien').oninput = () => { SETTINGS.modeleLien = $('stgLien').value.trim(); saveSettings(); render() }
+  $('stgReversible').onchange = () => { SETTINGS.reversible = $('stgReversible').checked; rsel = { A: {}, B: {} }; saveSettings(); render() }
+  $('stgHideDeleted').onchange = () => { SETTINGS.masquerSupprimes = $('stgHideDeleted').checked; saveSettings(); render() }
+  $('stgRequeteOk').onclick = () => enregistrerRequete(() => api('/api/requete', { methode: 'POST', corps: { sql: $('stgRequete').value } }))
+  $('stgRptdesign').onchange = (e) => {
+    const fichier = e.target.files[0]
+    if (fichier) enregistrerRequete(() => api('/api/requete/rptdesign', { methode: 'POST', fichier }))
+    e.target.value = ''
+  }
+
+  // Survol de la photo d'une pièce : aperçu agrandi au centre (délégation, le tableau étant reconstruit à chaque filtre)
+  const box = $('photoPreview'), big = box.querySelector('img')
+  app.onmouseover = (e) => {
+    const img = e.target.closest && e.target.closest('.photobox img')
+    if (!img || !img.complete || !img.naturalWidth) return
+    big.src = img.currentSrc || img.src; box.classList.add('on')
+  }
+  app.onmouseout = (e) => { if (e.target.closest && e.target.closest('.photobox img')) box.classList.remove('on') }
+  if (!ecouteDefilement) {
+    ecouteDefilement = true
+    window.addEventListener('scroll', () => $('photoPreview')?.classList.remove('on'), { passive: true })
+  }
+
+  logoEtTitre()
+}
+
+// Variante aléatoire du logo à l'ouverture : une fois sur deux, un chevelu (coupe afro, sans barbe) plutôt que le barbu.
+// Easter egg discret : clique sur la tête, elle gonfle, éclate au 10e clic → concombre masqué (re-clique pour revenir)
+const CHEVELU_SVG = `<svg viewBox="0 0 80 80" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="40" cy="15" r="15" fill="currentColor" stroke="none"/>
+      <circle cx="21" cy="19" r="12" fill="currentColor" stroke="none"/>
+      <circle cx="59" cy="19" r="12" fill="currentColor" stroke="none"/>
+      <circle cx="10" cy="29" r="10" fill="currentColor" stroke="none"/>
+      <circle cx="70" cy="29" r="10" fill="currentColor" stroke="none"/>
+      <circle cx="16" cy="38" r="8.5" fill="currentColor" stroke="none"/>
+      <circle cx="64" cy="38" r="8.5" fill="currentColor" stroke="none"/>
+      <path d="M20.5,32 C15.5,31 15,40 20.5,41 M59.5,32 C64.5,31 65,40 59.5,41"/>
+      <circle cx="32" cy="32" r="6" stroke-width="2"/><circle cx="48" cy="32" r="6" stroke-width="2"/>
+      <path d="M38,31.5 Q40,29.8 42,31.5 M26,31 L20.5,30 M54,31 L59.5,30" stroke-width="2"/>
+      <circle cx="32" cy="32.5" r="1.8" fill="currentColor" stroke="none"/><circle cx="48" cy="32.5" r="1.8" fill="currentColor" stroke="none"/>
+      <path d="M40,36 L38.5,41 L41,41.5" stroke-width="1.8"/>
+      <path d="M20.5,38 Q21,56 40,60 Q59,56 59.5,38"/>
+      <path d="M33,49 Q40,53.5 47,49" stroke-width="1.8"/>
+    </svg>`
+function logoEtTitre() {
+  const logo = $('logo'), title = $('title')
+  if (Math.random() < 0.5) { logo.innerHTML = CHEVELU_SVG; title.textContent = 'Recherche PDR du chevelu' }
+  const original = logo.innerHTML, ORIGINAL_TITLE = title.textContent
+  const CUCUMBER = '<span class="cucumber" role="img" aria-label="concombre masqué">🥒</span><span class="mask" role="img" aria-label="masque">😷</span>'
+  let clicks = 0, popped = false
+  logo.addEventListener('click', () => {
+    if (popped) { popped = false; clicks = 0; logo.style.transform = ''; logo.innerHTML = original; title.textContent = ORIGINAL_TITLE; return }
+    clicks++
+    if (clicks >= 10) {
+      popped = true
+      logo.classList.add('pop')
+      setTimeout(() => { logo.classList.remove('pop'); logo.style.transform = ''; logo.innerHTML = CUCUMBER; title.textContent = 'Recherche PDR du concombre masqué' }, 220)
+    } else {
+      logo.style.transform = `scale(${1 + clicks * 0.08})`
+    }
+  })
+}

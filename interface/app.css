@@ -1,0 +1,134 @@
+/* PDRTec : la page « Recherche PDR du Barbu », dans le thème commun de KTEC.
+   Ses couleurs d'origine sont reliées aux variables du thème ; tout est limité à .pdrtec pour ne rien
+   changer aux autres écrans. */
+
+.pdrtec {
+  /* (--accent et --mono existent déjà sous ce nom dans le thème : on les reprend tels quels) */
+  --bg: var(--fond); --surface: var(--carte); --fg: var(--texte); --muted: var(--texte-3); --line: var(--bord);
+  --accent-soft: var(--accent-doux); --chip: var(--carte-2);
+  --danger: var(--rouge); --danger-soft: var(--rouge-doux);
+  --sans: var(--police);
+  color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5;
+  max-width: 1200px; margin: 0 auto; display: grid; gap: 20px;
+}
+.pdrtec header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; }
+.pdrtec h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.01em; margin: 0; }
+.pdrtec .sub { color: var(--muted); margin: 2px 0 0; font-size: .9rem; }
+.pdrtec .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.pdrtec .btn { font: inherit; font-weight: 600; font-size: .88rem; border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+  padding: 9px 16px; border-radius: 999px; cursor: pointer; transition: border-color .15s; display: inline-flex; align-items: center; gap: 6px; }
+.pdrtec .btn:hover { border-color: var(--accent); }
+.pdrtec .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-texte); }
+.pdrtec .btn:focus-visible, .pdrtec select:focus-visible, .pdrtec input:focus-visible, .pdrtec tr[tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pdrtec .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 18px; display: grid; gap: 14px; }
+.pdrtec .search { position: relative; }
+.pdrtec .search input { width: 100%; box-sizing: border-box; font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 999px; padding: 12px 18px 12px 44px; }
+.pdrtec .search svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.pdrtec .filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.pdrtec .f { display: grid; gap: 4px; min-width: 0; }
+.pdrtec .f label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-left: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pdrtec .f select { appearance: none; -webkit-appearance: none; font: inherit; font-size: .92rem; width: 100%; color: var(--fg);
+  background: var(--chip) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%23889' stroke-width='1.6'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border: 1px solid transparent; border-radius: 999px; padding: 10px 36px 10px 14px; cursor: pointer; text-overflow: ellipsis; transition: background-color .15s, border-color .15s; }
+.pdrtec .f select:hover { border-color: var(--line); }
+.pdrtec .f select.on { background-color: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.pdrtec .f input.tensioninput { font: inherit; font-size: .92rem; width: 100%; box-sizing: border-box; color: var(--fg); background: var(--chip);
+  border: 1px solid transparent; border-radius: 999px; padding: 10px 14px; transition: background-color .15s, border-color .15s; }
+.pdrtec .f input.tensioninput:hover { border-color: var(--line); }
+.pdrtec .f input.tensioninput.on { background-color: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.pdrtec .group { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.pdrtec .group h2 { margin: 0; font-size: .82rem; font-weight: 600; color: var(--muted); }
+.pdrtec .group h2 b { color: var(--accent); font-weight: 700; }
+.pdrtec .fade { animation: pdr-fade .25s ease; }
+@keyframes pdr-fade { from { opacity: .3; transform: translateY(-3px) } to { opacity: 1; transform: none } }
+.pdrtec .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.pdrtec .count { font-family: var(--mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pdrtec .count b { color: var(--fg); font-weight: 500; }
+.pdrtec .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pdrtec .chip { font: inherit; font-size: .8rem; font-weight: 600; background: var(--accent-soft); color: var(--accent); border: 0; border-radius: 999px; padding: 5px 10px 5px 12px; cursor: pointer; }
+.pdrtec .chip span { opacity: .7; margin-left: 4px; }
+.pdrtec .tablebox { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow-x: auto; }
+.pdrtec table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+.pdrtec th, .pdrtec td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+.pdrtec th { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; background: var(--surface); }
+.pdrtec th[data-key] { cursor: pointer; user-select: none; }
+.pdrtec th[data-key]:hover { color: var(--fg); }
+.pdrtec th.char { color: var(--accent); }
+.pdrtec tbody tr.row { cursor: pointer; }
+.pdrtec tbody tr.row:hover td { background: var(--bg); }
+.pdrtec td.code { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pdrtec td.des { font-weight: 600; }
+.pdrtec td .caret { display: inline-block; color: var(--muted); transition: transform .15s; margin-right: 6px; }
+.pdrtec tr.open .caret { transform: rotate(90deg); }
+.pdrtec tr.detail td { background: var(--bg); white-space: normal; padding: 4px 16px 16px 40px; }
+.pdrtec .detailgrid { display: flex; gap: 20px; align-items: flex-start; }
+.pdrtec .photobox { width: 110px; height: 110px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden; color: var(--muted); }
+.pdrtec .photobox img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 12px; cursor: zoom-in; }
+/* Aperçu au survol : photo 4× (440 px) au centre de l'écran, sans bloquer la souris */
+#photoPreview { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.96); z-index: 1000; pointer-events: none;
+  width: 440px; height: 440px; max-width: 90vw; max-height: 90vh; border-radius: 18px; overflow: hidden; background: var(--carte);
+  border: 1px solid var(--bord); box-shadow: 0 20px 60px rgba(0, 0, 0, .35); opacity: 0; transition: opacity .12s ease, transform .12s ease; }
+#photoPreview.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#photoPreview img { width: 100%; height: 100%; object-fit: contain; display: block; background: var(--carte); }
+.pdrtec .photobox .sadlabel { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.pdrtec .goat { display: block; font-size: 2.6rem; line-height: 1; animation: pdr-goatjump 1.3s cubic-bezier(.36, 0, .64, 1) infinite; transform-origin: 50% 100%; }
+@keyframes pdr-goatjump { 0%, 100% { transform: translateY(0) scaleX(1) } 30% { transform: translateY(0) scaleX(1.06) } 55% { transform: translateY(-11px) scaleX(.96) } 80% { transform: translateY(0) scaleX(1.06) } }
+.pdrtec .obs { max-width: 70ch; flex: 1; min-width: 0; color: var(--fg); font-size: .88rem; display: grid; gap: 2px; }
+.pdrtec .obs .k { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 10px; }
+.pdrtec .kv { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pdrtec .kv span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: .82rem; }
+.pdrtec .kv span b { font-weight: 600; }
+.pdrtec .kcat { font-size: .78rem; font-weight: 600; color: var(--accent); margin-top: 8px; }
+.pdrtec .fgroup { grid-column: 1 / -1; display: grid; gap: 8px; }
+.pdrtec .fgroup .kcat { margin-top: 4px; padding-left: 4px; }
+.pdrtec .revnote { color: var(--muted); font-weight: 500; margin-left: 8px; }
+.pdrtec .cpy { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 6px; vertical-align: middle; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; padding: 0; opacity: .55; transition: opacity .15s, color .15s, background-color .15s; }
+.pdrtec tr.row:hover .cpy, .pdrtec .cpy:focus-visible { opacity: 1; }
+.pdrtec .cpy:hover { color: var(--accent); background: var(--accent-soft); opacity: 1; }
+.pdrtec .cpy.ok { color: var(--accent); opacity: 1; }
+.pdrtec .cpy svg { width: 15px; height: 15px; }
+.pdrtec .na { color: var(--muted); }
+.pdrtec mark.hl { background: var(--accent-soft); color: var(--accent); font-weight: 600; border-radius: 6px; padding: 1px 6px; }
+.pdrtec td.empl { font-family: var(--mono); font-size: .85rem; }
+.pdrtec .tag-del { display: inline-block; background: var(--danger-soft); color: var(--danger); font-weight: 700; border-radius: 999px; padding: 1px 8px; font-size: .78rem; letter-spacing: .03em; }
+.pdrtec .pjlist { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.pdrtec .pjitem { width: 64px; height: 64px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; display: grid; place-items: center; color: var(--muted); text-decoration: none; }
+.pdrtec .pjitem img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pdrtec .pjitem:hover { border-color: var(--accent); }
+.pdrtec .pjitem.doc { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; text-align: center; padding: 4px; line-height: 1.2; }
+.pdrtec .empty { padding: 40px 16px; text-align: center; color: var(--muted); white-space: normal; }
+.pdrtec .note { font-size: .82rem; color: var(--muted); margin: 0; }
+.pdrtec.drop { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 20px; }
+.pdrtec .logo { display: flex; justify-content: center; color: var(--accent); margin-bottom: -6px; transform-origin: center; transition: transform .18s cubic-bezier(.34, 1.56, .64, 1); cursor: pointer; }
+.pdrtec .logo.pop { animation: pdr-logopop .22s ease-out forwards; }
+@keyframes pdr-logopop { 0% { transform: scale(1.7) } 55% { transform: scale(2.05) } 100% { transform: scale(0) } }
+.pdrtec .logo .cucumber { font-size: 56px; line-height: 1; display: inline-block; animation: pdr-logoin .25s ease-out; }
+.pdrtec .logo .mask { font-size: 24px; margin-left: -16px; animation: pdr-logoinmask .25s ease-out .05s both; }
+@keyframes pdr-logoin { 0% { transform: scale(0) } 70% { transform: scale(1.15) } 100% { transform: scale(1) } }
+@keyframes pdr-logoinmask { 0% { transform: scale(0) translateY(8px) } 70% { transform: scale(1.15) translateY(8px) } 100% { transform: scale(1) translateY(8px) } }
+.pdrtec .titlerow { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; }
+.pdrtec .btn.small { font-size: .8rem; padding: 6px 12px; color: var(--accent); border-color: var(--accent-soft); background: var(--accent-soft); }
+.pdrtec .bandeau-source { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+
+/* Fenêtres (notice, paramètres, choix de fichier) */
+.pdrtec-dialog { border: 1px solid var(--bord); border-radius: 20px; background: var(--carte); color: var(--texte); padding: 22px; max-width: min(680px, calc(100vw - 32px)); box-sizing: border-box; font-size: 15px; line-height: 1.5; }
+.pdrtec-dialog::backdrop { background: rgba(5, 10, 7, .6); }
+.pdrtec-dialog .dhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pdrtec-dialog h2 { margin: 0; font-size: 1.15rem; }
+.pdrtec-dialog ol { padding-left: 1.2em; display: grid; gap: 10px; margin: 16px 0; line-height: 1.55; }
+.pdrtec-dialog li b { color: var(--accent); }
+.pdrtec-dialog .note { font-size: .82rem; color: var(--texte-3); margin: 0; }
+.pdrtec-dialog .stgrow { display: grid; gap: 6px; margin: 14px 0; }
+.pdrtec-dialog .stgrow > label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--texte-3); }
+.pdrtec-dialog .stginput { font: inherit; border: 1px solid var(--bord); background: var(--fond); color: var(--texte); border-radius: 999px; padding: 10px 16px; width: 100%; box-sizing: border-box; }
+.pdrtec-dialog textarea.stginput { border-radius: 12px; font-family: var(--mono); font-size: 12px; min-height: 160px; }
+.pdrtec-dialog .stgcheck { display: flex; align-items: center; gap: 8px; font-size: .9rem; cursor: pointer; }
+.pdrtec-dialog .stgcheck input, .pdrtec-dialog .chklist input { width: auto; }
+.pdrtec-dialog .chklist { display: grid; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 4px; margin-top: 4px; }
+.pdrtec-dialog .chklist label { display: flex; align-items: center; gap: 8px; font-size: .88rem; font-weight: 400; color: var(--texte); }
+.pdrtec-dialog .btn { font: inherit; font-weight: 600; font-size: .88rem; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); padding: 9px 16px; border-radius: 999px; cursor: pointer; }
+.pdrtec-dialog .btn.small { font-size: .8rem; padding: 6px 12px; color: var(--accent); border-color: var(--accent-doux); background: var(--accent-doux); }
+.pdrtec-dialog #filechoiceList .btn { width: 100%; text-align: left; border-radius: 12px; }
+
+@media (prefers-reduced-motion: reduce) { .pdrtec *, #photoPreview { transition: none !important; animation: none !important; } }
