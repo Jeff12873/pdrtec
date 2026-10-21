@@ -2,6 +2,9 @@
 //
 // Tout ce qui est propre au site est dans le fichier .ktec, jamais dans le programme :
 //   « pdrtec.requete »  → la requête du rapport de recherche (une ligne par caractéristique de pièce)
+//   « pdrtec.arborescence » → { arbre, liens } : deux requêtes pour filtrer par l'arborescence des machines (ITM)
+//        arbre : une ligne par nœud → colonnes noeud, parent, code, designation, machine (et ordre, facultatif)
+//        liens : une ligne par pièce montée sur une machine → colonnes codePiece, machine
 //   « pdrtec.reglages » → adresse du serveur des photos, modèle de lien des fichiers, pièces réversibles,
 //                         emplacements supprimés masqués, modèles filtrés par tension, familles proposées
 // La requête s'importe d'un .rptdesign (le rapport BIRT existant) ou se colle dans les paramètres.
@@ -23,11 +26,46 @@ const LIGNES_MAX = 1_000_000
 
 // Les données lues sur la base, gardées en mémoire jusqu'au prochain « Actualiser ».
 let cache = null // { sql, colonnes, lignes, date, dureeMs, tronque }
+let cacheArbo = null // { cle, arbre, liens }
 
 const reglages = () => ({ ...REGLAGES_DEFAUT, ...lireInfo('pdrtec.reglages', {}) })
 
 export function routes(r) {
-  r.get('/api/reglages', () => ({ ...reglages(), requete: lireInfo('pdrtec.requete', '') }))
+  r.get('/api/reglages', () => ({ ...reglages(), requete: lireInfo('pdrtec.requete', ''), arborescence: lireInfo('pdrtec.arborescence', { arbre: '', liens: '' }) }))
+
+  // Les deux requêtes de l'arborescence (vides : pas de filtre par machine).
+  r.post('/api/arborescence/requetes', async (ctx) => {
+    const { arbre = '', liens = '' } = await ctx.json()
+    const propre = (sql) => String(sql || '').trim().replace(/;\s*$/, '')
+    for (const sql of [arbre, liens].map(propre).filter(Boolean)) {
+      if (!/^(\s|--[^\n]*\n|\/\*[\s\S]*?\*\/)*(select|with)\b/i.test(sql)) throw new ErreurHttp(400, 'Les requêtes doivent être des lectures (SELECT).')
+    }
+    ecrireInfo('pdrtec.arborescence', { arbre: propre(arbre), liens: propre(liens) })
+    cacheArbo = null
+    return { arbre: propre(arbre), liens: propre(liens) }
+  })
+
+  // L'arborescence : { arbre: [[noeud, parent, code, designation, machine, ordre]], liens: [[codePiece, machine]] }.
+  r.get('/api/arborescence', async (ctx) => {
+    const { arbre, liens } = lireInfo('pdrtec.arborescence', { arbre: '', liens: '' })
+    if (!arbre || !liens) return { arbre: [], liens: [], reglee: false }
+    const cle = arbre + '\u0001' + liens
+    if (cacheArbo && cacheArbo.cle === cle && !ctx.query.rafraichir) return { arbre: cacheArbo.arbre, liens: cacheArbo.liens, reglee: true }
+    const [a, l] = [await executerRequete(sansCommentaires(arbre), LIGNES_MAX), await executerRequete(sansCommentaires(liens), LIGNES_MAX)]
+    // Les colonnes sont prises par leur nom (l'ordre de la requête est libre).
+    const colonnes = (r, noms) => noms.map((n) => r.colonnes.findIndex((c) => c.nom.toLowerCase() === n.toLowerCase()))
+    const ia = colonnes(a, ['noeud', 'parent', 'code', 'designation', 'machine', 'ordre'])
+    const il = colonnes(l, ['codePiece', 'machine'])
+    if (ia.slice(0, 5).some((i) => i < 0)) throw new ErreurHttp(400, 'Requête de l’arborescence : il faut les colonnes noeud, parent, code, designation et machine.')
+    if (il.some((i) => i < 0)) throw new ErreurHttp(400, 'Requête des pièces par machine : il faut les colonnes codePiece et machine.')
+    cacheArbo = {
+      cle,
+      arbre: a.lignes.map((x) => ia.map((i) => (i < 0 ? null : x[i]))),
+      liens: l.lignes.map((x) => il.map((i) => x[i])),
+    }
+    journal(`PDRTec : arborescence de ${cacheArbo.arbre.length} nœuds, ${cacheArbo.liens.length} pièces montées`)
+    return { arbre: cacheArbo.arbre, liens: cacheArbo.liens, reglee: true }
+  })
 
   r.post('/api/reglages', async (ctx) => {
     const changements = await ctx.json()

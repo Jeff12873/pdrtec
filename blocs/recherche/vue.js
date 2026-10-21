@@ -141,6 +141,15 @@ const PAGE = `
       <input type="file" id="stgRptdesign" accept=".rptdesign" hidden>
     </div>
   </div>
+  <div class="stgrow">
+    <label for="stgArbre">Arborescence des machines (filtre en cascade)</label>
+    <p class="note">Deux requêtes, pour filtrer les pièces par ligne, sous-ensemble et machine, comme dans l'arborescence de la GMAO. Laisser vide pour ne pas proposer ce filtre.</p>
+    <textarea id="stgArbre" class="stginput" spellcheck="false" placeholder="L'arbre : une ligne par nœud, colonnes noeud, parent, code, designation, machine (et ordre)"></textarea>
+    <textarea id="stgLiens" class="stginput" spellcheck="false" placeholder="Les pièces montées : une ligne par pièce et par machine, colonnes codePiece, machine"></textarea>
+    <div class="actions" style="justify-content:flex-start">
+      <button class="btn small" id="stgArboOk" type="button">Enregistrer les requêtes de l'arborescence</button>
+    </div>
+  </div>
 </dialog>
 
 <dialog id="filechoice" class="pdrtec-dialog" aria-labelledby="filechoiceTitle">
@@ -161,6 +170,45 @@ const NA = '(non renseigné)'
 const $ = (id) => document.getElementById(id)
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+// Comme esc, avec les mots de la recherche surlignés (accents et majuscules ignorés, comme pour trouver la pièce).
+function hl(s) {
+  const texte = String(s ?? '')
+  if (!Q.length || !texte) return esc(texte)
+  // Texte « normalisé » caractère par caractère, pour retrouver la position d'origine de chaque correspondance.
+  let n = ''
+  const origine = []
+  for (let i = 0; i < texte.length; i++) {
+    const c = norm(texte[i])
+    for (let k = 0; k < c.length; k++) origine.push(i)
+    n += c
+  }
+  const zones = []
+  for (const t of Q) {
+    if (t.w) {
+      for (let i = n.indexOf(t.w); i >= 0; i = n.indexOf(t.w, i + 1)) zones.push([i, i + t.w.length])
+    } else if (t.re) {
+      const re = new RegExp(t.re.source, 'g')
+      for (let m; (m = re.exec(n)); re.lastIndex = m.index + 1) {
+        const debut = m.index + m[1].length
+        zones.push([debut, m.index + m[0].length - (m[2] || '').length])
+      }
+    }
+  }
+  if (!zones.length) return esc(texte)
+  // Zones fusionnées, puis ramenées aux positions du texte d'origine.
+  zones.sort((a, b) => a[0] - b[0])
+  const fusion = []
+  for (const z of zones) { const d = fusion.at(-1); if (d && z[0] <= d[1]) d[1] = Math.max(d[1], z[1]); else fusion.push([...z]) }
+  let html = ''
+  let pos = 0
+  for (const [a, b] of fusion) {
+    const debut = origine[a], fin = origine[b - 1] + 1
+    if (debut < pos) continue
+    html += esc(texte.slice(pos, debut)) + `<mark class="trouve">${esc(texte.slice(debut, fin))}</mark>`
+    pos = fin
+  }
+  return html + esc(texte.slice(pos))
+}
 const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim()
 const isMiniKey = (k) => norm(k).replace(/[^a-z]/g, '') === 'tensionmini'
 const isMaxiKey = (k) => norm(k).replace(/[^a-z]/g, '') === 'tensionmaxi'
@@ -176,6 +224,9 @@ let rsel = { A: {}, B: {} }, REV = null
 let lastModel = null, sortKey = 'des', sortIsChar = false, sortDir = 1, tKeyMini = null, tKeyMaxi = null, tensionVal = ''
 let SETTINGS = { serveur: '', modeleLien: '', reversible: false, masquerSupprimes: false, modelesTension: [], propositions: true }
 let requeteReglee = false
+// Arborescence des machines : nœuds (Map id → { id, parent, code, desi, ordre, enfants }), liens pièce → machines,
+// et la suite des nœuds choisis dans les menus en cascade (du haut vers le bas).
+let ARBO = null, asel = []
 let ecouteDefilement = false
 
 // ---------------------------------------------------------------- démarrage de l'écran
@@ -185,6 +236,8 @@ async function demarrer() {
   requeteReglee = Boolean(lus.requete)
   SETTINGS = { ...SETTINGS, ...lus }
   $('stgRequete').value = lus.requete || ''
+  $('stgArbre').value = lus.arborescence?.arbre || ''
+  $('stgLiens').value = lus.arborescence?.liens || ''
   brancherEvenements()
   render()
   chargerDepuisLaBase(false)
@@ -205,7 +258,11 @@ async function chargerDepuisLaBase(rafraichir) {
   }
   $('source').textContent = rafraichir ? 'Lecture de la base…' : 'Chargement des pièces…'
   try {
-    const d = await api(`/api/donnees${rafraichir ? '?rafraichir=1' : ''}`)
+    const [d, a] = await Promise.all([
+      api(`/api/donnees${rafraichir ? '?rafraichir=1' : ''}`),
+      api(`/api/arborescence${rafraichir ? '?rafraichir=1' : ''}`).catch((erreur) => { notifier(`Arborescence : ${erreur.message}`, 'erreur'); return null }),
+    ])
+    chargerArbo(a)
     const date = new Date(d.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
     fromAOA([d.colonnes, ...d.lignes], `base de la GMAO, lue le ${date}${d.tronque ? ' (liste tronquée)' : ''}`)
   } catch (erreur) {
@@ -284,7 +341,7 @@ const isDeletedEmpl = (e) => norm(e).replace(/[^a-z]/g, '') === 'supprime'
 const emplParts = (e) => String(e ?? '').split(';').map(clean).filter(Boolean)
 function emplHtml(e) {
   const parts = emplParts(e); if (!parts.length) return '<span class="na">—</span>'
-  return parts.map((x) => (isDeletedEmpl(x) ? `<span class="tag-del">${esc(x)}</span>` : esc(x))).join(' ; ')
+  return parts.map((x) => (isDeletedEmpl(x) ? `<span class="tag-del">${esc(x)}</span>` : hl(x))).join(' ; ')
 }
 // Le rapport sort une ligne par caractéristique : on regroupe par code pièce
 function fromAOA(aoa, label) {
@@ -318,12 +375,13 @@ function fromAOA(aoa, label) {
   PIECES = [...map.values()]
   PIECES.forEach((p) => { const pr = emplParts(p.empl); p.deleted = pr.length > 0 && pr.every(isDeletedEmpl) })
   PIECES.forEach((p) => { p.familleGmao = p.famille; p.sousfamilleGmao = p.sousfamille })
+  rattacherArbo()
   proposerFamilles()
   appliquerPropositions()
   const nMod = new Set(PIECES.map((p) => p.modele)).size
   const nProp = PIECES.filter((p) => p.prop).length
   $('source').textContent = `${PIECES.length} pièces · ${nMod} modèles de fiche` + (nProp ? ` · ${nProp} famille${nProp > 1 ? 's' : ''} proposée${nProp > 1 ? 's' : ''}` : '') + (stamp ? ` · extraction du ${stamp}` : '') + (label ? ` · ${label}` : '')
-  sel = {}; csel = {}; rsel = { A: {}, B: {} }; q = ''; Q = []; $('q').value = ''; lastModel = null
+  sel = {}; csel = {}; rsel = { A: {}, B: {} }; asel = []; q = ''; Q = []; $('q').value = ''; lastModel = null
   render()
 }
 
@@ -430,10 +488,63 @@ function explicationProposition(p, k) {
 
 // ---------------------------------------------------------------- filtres et tableau
 
+// ---------------------------------------------------------------- arborescence des machines (filtre en cascade)
+
+function chargerArbo(a) {
+  if (!a?.reglee || !a.arbre.length) { ARBO = null; asel = []; return }
+  const noeuds = new Map()
+  for (const [id, parent, code, desi, machine, ordre] of a.arbre) noeuds.set(String(id), { id: String(id), parent: parent == null ? '' : String(parent), code: clean(code), desi: clean(desi), machine: String(machine ?? ''), ordre: Number(ordre) || 0, enfants: [] })
+  for (const n of noeuds.values()) noeuds.get(n.parent)?.enfants.push(n)
+  // Les nœuds d'une machine (une machine peut être à plusieurs endroits de l'arbre).
+  const parMachine = new Map()
+  for (const n of noeuds.values()) { if (!parMachine.has(n.machine)) parMachine.set(n.machine, []); parMachine.get(n.machine).push(n) }
+  const machinesDe = new Map()
+  for (const [code, machine] of a.liens) { const c = clean(code); if (!machinesDe.has(c)) machinesDe.set(c, new Set()); machinesDe.get(c).add(String(machine)) }
+  ARBO = { noeuds, parMachine, machinesDe }
+  asel = asel.filter((id) => noeuds.has(id))
+}
+
+// Chaque pièce reçoit les nœuds où elle est montée et tous leurs ancêtres (p.arbo), et ses chemins (p.chemins).
+function rattacherArbo() {
+  if (!ARBO) { PIECES.forEach((p) => { p.arbo = null; p.chemins = [] }); return }
+  for (const p of PIECES) {
+    p.arbo = new Set(); p.chemins = []
+    for (const m of ARBO.machinesDe.get(p.code) || []) {
+      for (const n of ARBO.parMachine.get(m) || []) {
+        const chemin = []
+        for (let x = n, garde = 0; x && garde < 30; x = ARBO.noeuds.get(x.parent), garde++) { chemin.unshift(x); p.arbo.add(x.id) }
+        p.chemins.push(chemin)
+      }
+    }
+  }
+}
+const libelleNoeud = (n) => (n.desi && n.desi !== n.code ? `${n.code} (${n.desi})` : n.code)
+const parOrdre = (a, b) => a.ordre - b.ordre || a.code.localeCompare(b.code, 'fr', { numeric: true })
+
+// Les menus en cascade : les racines, puis les enfants du nœud choisi… (seulement là où il y a des pièces).
+function menusArbo() {
+  if (!ARBO) return ''
+  const candidates = PIECES.filter((p) => match(p, 'arbo'))
+  const compte = new Map()
+  for (const p of candidates) for (const id of p.arbo || []) compte.set(id, (compte.get(id) || 0) + 1)
+  if (!compte.size && !asel.length) return ''
+  const racines = [...ARBO.noeuds.values()].filter((n) => !ARBO.noeuds.has(n.parent))
+  const niveaux = [racines]
+  for (const id of asel) { const n = ARBO.noeuds.get(id); if (n?.enfants.length) niveaux.push(n.enfants) }
+  return niveaux.map((liste, i) => {
+    const courant = asel[i] || ''
+    // Le nœud choisi reste affiché même si la recherche ne trouve plus de pièce dessous.
+    const choix = liste.filter((n) => compte.get(n.id) || n.id === courant).sort(parOrdre)
+    if (!choix.length) return ''
+    return `<div class="f"><label for="a_${i}">${i ? '› Dans ' + esc(ARBO.noeuds.get(asel[i - 1])?.code || '') : 'Ligne / arborescence'}</label><select id="a_${i}" data-a="${i}" class="${courant ? 'on' : ''}"><option value="">Tous</option>${choix.map((n) => `<option value="${esc(n.id)}"${n.id === courant ? ' selected' : ''}>${esc(libelleNoeud(n))} (${compte.get(n.id) || 0})</option>`).join('')}</select></div>`
+  }).join('')
+}
+
 function match(p, skipMain, skipChar) {
   if (SETTINGS.masquerSupprimes && p.deleted) return false
   if (Q.length && !Q.every((t) => (t.re ? t.re.test(p.__t) : p.__t.includes(t.w)))) return false
   for (const k in sel) { if (k !== skipMain && p[k] !== sel[k]) return false }
+  if (asel.length && skipMain !== 'arbo' && !p.arbo?.has(asel.at(-1))) return false
   for (const k in csel) { if (k !== skipChar && (p.car[k] ?? '') !== csel[k]) return false }
   if (revActive() && !revAssign(p, skipChar && typeof skipChar === 'object' ? skipChar : null).length) return false
   if (tKeyMini && tKeyMaxi && tensionVal !== '') {
@@ -470,7 +581,10 @@ function render() {
 
   // Filtres principaux
   $('filters').innerHTML = MAIN.map(([k, l]) => `<div class="f"><label for="m_${k}">${l}</label><select id="m_${k}" data-k="${k}" class="${sel[k] ? 'on' : ''}">${options(PIECES.filter((p) => match(p, k)).map((p) => p[k]), sel[k])}</select></div>`).join('')
-  $('filters').querySelectorAll('select').forEach((s) => (s.onchange = () => { const k = s.dataset.k; s.value ? (sel[k] = s.value) : delete sel[k]; render() }))
+  $('filters').insertAdjacentHTML('beforeend', menusArbo())
+  $('filters').querySelectorAll('select[data-k]').forEach((s) => (s.onchange = () => { const k = s.dataset.k; s.value ? (sel[k] = s.value) : delete sel[k]; render() }))
+  // Choisir un nœud garde ceux du dessus et efface ceux du dessous.
+  $('filters').querySelectorAll('select[data-a]').forEach((s) => (s.onchange = () => { const i = Number(s.dataset.a); asel = asel.slice(0, i); if (s.value) asel.push(s.value); render() }))
   // Caractéristiques : n'apparaissent qu'une fois le modèle déterminé
   const chars = modelChars()
   $('chartitle').innerHTML = sel.modele ? (chars.length ? `Caractéristiques · <b>${esc(sel.modele)}</b>` : `Aucune caractéristique renseignée pour <b>${esc(sel.modele)}</b>`) : 'Choisis une sous-famille pour filtrer sur ses caractéristiques'
@@ -528,9 +642,10 @@ function render() {
   // Pastilles des filtres actifs
   const chips = [...MAIN.filter(([k]) => sel[k]).map(([k, l]) => ({ t: 'm', k, l, v: sel[k] })), ...Object.keys(csel).map((k) => ({ t: 'c', k, l: k, v: csel[k] })),
     ...(tensionMode && tensionVal !== '' ? [{ t: 't', k: 'tension', l: 'Tension', v: tensionVal + ' V' }] : []),
+    ...(asel.length && ARBO ? [{ t: 'a', k: 'arbo', l: asel.map((id) => ARBO.noeuds.get(id)?.code).join(' › '), v: libelleNoeud(ARBO.noeuds.get(asel.at(-1))) }] : []),
     ...(REV ? ['A', 'B'].flatMap((sd) => Object.keys(rsel[sd]).map((n) => { const L = REV.labels.find((x) => x.n === n); return { t: 'r', s: sd, n, l: (sd === 'A' ? 'Un côté' : "L'autre côté") + ' · ' + (L ? L.label : n), v: rsel[sd][n] } })) : [])]
   $('chips').innerHTML = chips.map((c, i) => `<button class="chip" type="button" data-i="${i}" title="${esc(c.l)}">${esc(c.v)}<span>✕</span></button>`).join('')
-  $('chips').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { const c = chips[b.dataset.i]; if (c.t === 'm') delete sel[c.k]; else if (c.t === 't') tensionVal = ''; else if (c.t === 'r') delete rsel[c.s][c.n]; else delete csel[c.k]; render() }))
+  $('chips').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { const c = chips[b.dataset.i]; if (c.t === 'm') delete sel[c.k]; else if (c.t === 'a') asel = []; else if (c.t === 't') tensionVal = ''; else if (c.t === 'r') delete rsel[c.s][c.n]; else delete csel[c.k]; render() }))
 
   // Tableau, triable en cliquant sur une colonne (pastille ▲▼ = colonne active)
   if (sortIsChar && !chars.includes(sortKey)) { sortKey = 'des'; sortIsChar = false; sortDir = 1 }
@@ -557,7 +672,7 @@ function render() {
   // Famille ou sous-famille proposée par PDRTec (absente de la GMAO) : en jaune, avec la raison au survol.
   const cellClasse = (p, k) => (p.propose?.[k] ? `<span class="propose" title="${esc(explicationProposition(p, k))}">${esc(p[k])}</span>` : cell(p[k]))
   $('tbody').innerHTML = res.length ? res.slice(0, 500).map((p, i) =>
-    `<tr class="row" tabindex="0" data-i="${i}"><td class="code"><span class="caret">›</span>${esc(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button></td><td class="des">${esc(p.des)}</td><td class="empl">${emplHtml(p.empl)}</td><td>${cellClasse(p, 'famille')}</td><td>${cellClasse(p, 'sousfamille')}</td>${chars.map((c) => `<td>${cell(p.car[c])}</td>`).join('')}</tr>`
+    `<tr class="row" tabindex="0" data-i="${i}"><td class="code"><span class="caret">›</span>${hl(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button></td><td class="des">${hl(p.des)}</td><td class="empl">${emplHtml(p.empl)}</td><td>${cellClasse(p, 'famille')}</td><td>${cellClasse(p, 'sousfamille')}</td>${chars.map((c) => `<td>${cell(p.car[c])}</td>`).join('')}</tr>`
     + `<tr class="detail" hidden><td colspan="${n}">${detail(p)}</td></tr>`).join('')
     : PIECES.length ? `<tr><td class="empty" colspan="${n}">Aucune pièce ne correspond. Retire un filtre pour élargir.</td></tr>`
       : `<tr><td class="empty" colspan="${n}">Aucune donnée chargée. « Actualiser depuis la base », ou glisse un export Excel du rapport ici.</td></tr>`
@@ -627,12 +742,12 @@ function splitObsMachine(s) {
 // Observation machine : ce qui suit le premier « : » (l'observation elle-même) est surligné
 function omLine(l) {
   const i = l.indexOf(':')
-  if (i < 0 || !l.slice(i + 1).trim()) return `<div>${esc(l)}</div>`
-  return `<div>${esc(l.slice(0, i + 1))} <mark class="hl">${esc(l.slice(i + 1).trim())}</mark></div>`
+  if (i < 0 || !l.slice(i + 1).trim()) return `<div>${hl(l)}</div>`
+  return `<div>${hl(l.slice(0, i + 1))} <mark class="hl">${hl(l.slice(i + 1).trim())}</mark></div>`
 }
 // Caractéristiques regroupées par catégorie du dictionnaire (ordre d'apparition dans les données)
 function carGroups(p, kv) {
-  const chip = ([k, v]) => `<span>${esc(k)} : <b>${v ? esc(v) : '<span class="na">vide</span>'}</b></span>`
+  const chip = ([k, v]) => `<span>${esc(k)} : <b>${v ? hl(v) : '<span class="na">vide</span>'}</b></span>`
   const groups = new Map()
   kv.forEach((e) => { const g = p.carCat[e[0]] || ''; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(e) })
   if (groups.size === 1 && groups.has('')) return `<div class="kv">${kv.map(chip).join('')}</div>`
@@ -654,8 +769,9 @@ function detail(p) {
   const proposition = p.propose?.famille || p.propose?.sousfamille
     ? `<div class="k">Classement proposé (absent de la GMAO)</div><div><span class="propose">${esc(p.famille)} › ${esc(p.sousfamille)}</span></div><div class="note">${esc(explicationProposition(p, p.propose.sousfamille ? 'sousfamille' : 'famille'))}. À reporter dans la GMAO si c'est juste.</div>`
     : ''
-  const obs = `<div class="obs">${proposition}${p.empl ? `<div class="k">Emplacement</div><div>${emplHtml(p.empl)}</div>` : ''}<div class="k">Observation</div>${lines.length ? lines.map((l) => `<div>${esc(l)}</div>`).join('') : '<div class="na">Aucune observation</div>'}`
+  const obs = `<div class="obs">${proposition}${p.empl ? `<div class="k">Emplacement</div><div>${emplHtml(p.empl)}</div>` : ''}<div class="k">Observation</div>${lines.length ? lines.map((l) => `<div>${hl(l)}</div>`).join('') : '<div class="na">Aucune observation</div>'}`
     + (omLines.length ? `<div class="k">Observation machine</div>${omLines.map(omLine).join('')}` : '')
+    + (p.chemins?.length ? `<div class="k">Montée sur (arborescence)</div>${p.chemins.slice(0, 12).map((c) => `<div class="chemin-arbo">${c.map((n, i) => (i === c.length - 1 ? `<b>${hl(libelleNoeud(n))}</b>` : hl(n.code))).join(' › ')}</div>`).join('')}${p.chemins.length > 12 ? `<div class="na">… et ${p.chemins.length - 12} autres</div>` : ''}` : '')
     + (p.pj.length ? `<div class="k">Pièces jointes (${p.pj.length})</div><div class="pjlist">${pjs}</div>` : '')
     + `<div class="k">Caractéristiques</div>${kv.length ? carGroups(p, kv) : '<div class="na">Aucune</div>'}</div>`
   return `<div class="detailgrid">${photoBox(p)}${obs}</div>`
@@ -758,7 +874,7 @@ async function enregistrerRequete(envoi) {
 
 function brancherEvenements() {
   let t; $('q').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { q = e.target.value.trim(); Q = parseQuery(q); render() }, 120) }
-  $('reset').onclick = () => { sel = {}; csel = {}; rsel = { A: {}, B: {} }; q = ''; Q = []; $('q').value = ''; render() }
+  $('reset').onclick = () => { sel = {}; csel = {}; rsel = { A: {}, B: {} }; asel = []; q = ''; Q = []; $('q').value = ''; render() }
   $('actualiser').onclick = () => chargerDepuisLaBase(true)
   $('file').onchange = (e) => handleFiles(e.target.files)
   const app = $('app')
@@ -779,6 +895,16 @@ function brancherEvenements() {
   $('stgReversible').onchange = () => { SETTINGS.reversible = $('stgReversible').checked; rsel = { A: {}, B: {} }; saveSettings(); render() }
   $('stgHideDeleted').onchange = () => { SETTINGS.masquerSupprimes = $('stgHideDeleted').checked; saveSettings(); render() }
   $('stgPropositions').onchange = () => { SETTINGS.propositions = $('stgPropositions').checked; appliquerPropositions(); sel = {}; csel = {}; saveSettings(); render() }
+  $('stgArboOk').onclick = async () => {
+    try {
+      await api('/api/arborescence/requetes', { methode: 'POST', corps: { arbre: $('stgArbre').value, liens: $('stgLiens').value } })
+      notifier('Requêtes de l’arborescence enregistrées')
+      $('settings').close()
+      chargerDepuisLaBase(true)
+    } catch (erreur) {
+      notifier(erreur.message, 'erreur')
+    }
+  }
   $('stgRequeteOk').onclick = () => enregistrerRequete(() => api('/api/requete', { methode: 'POST', corps: { sql: $('stgRequete').value } }))
   $('stgRptdesign').onchange = (e) => {
     const fichier = e.target.files[0]

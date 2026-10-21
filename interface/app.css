@@ -32,6 +32,9 @@
   border: 1px solid transparent; border-radius: 999px; padding: 10px 36px 10px 14px; cursor: pointer; text-overflow: ellipsis; transition: background-color .15s, border-color .15s; }
 .pdrtec .f select:hover { border-color: var(--line); }
 .pdrtec .f select.on { background-color: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+/* La liste déroulante garde les couleurs du thème (sinon Windows l'ouvre claire, avec le vert du filtre actif : illisible). */
+.pdrtec .f select option { background-color: var(--carte); color: var(--texte); font-weight: 400; }
+.pdrtec .f select option:checked { background-color: var(--accent-doux); color: var(--accent); font-weight: 600; }
 .pdrtec .f input.tensioninput { font: inherit; font-size: .92rem; width: 100%; box-sizing: border-box; color: var(--fg); background: var(--chip);
   border: 1px solid transparent; border-radius: 999px; padding: 10px 14px; transition: background-color .15s, border-color .15s; }
 .pdrtec .f input.tensioninput:hover { border-color: var(--line); }
@@ -136,3 +139,8 @@
 .pdrtec-dialog #filechoiceList .btn { width: 100%; text-align: left; border-radius: 12px; }
 
 @media (prefers-reduced-motion: reduce) { .pdrtec *, #photoPreview { transition: none !important; animation: none !important; } }
+
+/* Le mot cherché, surligné dans le tableau et dans le détail de la pièce */
+.pdrtec mark.trouve { background: rgba(250, 204, 21, .28); color: inherit; border-radius: 3px; padding: 0 1px; box-shadow: 0 0 0 1px rgba(250, 204, 21, .45); }
+.pdrtec .chemin-arbo { font-size: .9rem; color: var(--muted); }
+.pdrtec .chemin-arbo b { color: var(--fg); font-weight: 600; }
