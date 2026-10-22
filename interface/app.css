@@ -191,3 +191,13 @@
 .pdrtec-dialog .ligne-coche input { flex: 1; min-width: 160px; }
 .pdrtec-dialog .ligne-regle input { flex: 1; min-width: 140px; }
 .pdrtec td.extra, .pdrtec th.extra { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Barre de défilement au-dessus du tableau, et largeur des colonnes réglable */
+.pdrtec .defil-haut { overflow-x: auto; overflow-y: hidden; height: 14px; margin-bottom: -12px; }
+.pdrtec .defil-haut > div { height: 1px; }
+.pdrtec th { position: relative; }
+.pdrtec .poignee-col { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; }
+.pdrtec .poignee-col::after { content: ''; position: absolute; top: 25%; bottom: 25%; right: 3px; width: 2px; border-radius: 2px; background: var(--line); }
+.pdrtec th:hover .poignee-col::after, .pdrtec .poignee-col:hover::after { background: var(--accent); }
+.pdrtec table.largeurs-fixes { table-layout: fixed; }
+.pdrtec table.largeurs-fixes th, .pdrtec table.largeurs-fixes tr.row td { overflow: hidden; text-overflow: ellipsis; }

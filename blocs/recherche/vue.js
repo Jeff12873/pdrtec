@@ -80,7 +80,8 @@ const PAGE = `
     </div>
   </section>
 
-  <div class="tablebox"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  <div class="defil-haut" id="defilHaut" hidden><div></div></div>
+  <div class="tablebox" id="tablebox"><table id="table"><colgroup id="colonnes"></colgroup><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
   <p class="note">Clique sur une pièce pour voir son observation et toutes ses caractéristiques. Les données viennent directement de la base de la GMAO (« Actualiser depuis la base ») ; sans connexion, glisse un export Excel du rapport sur la page : il est lu dans ton navigateur et n'est envoyé nulle part.</p>
 </div>
 
@@ -580,6 +581,60 @@ function menusArbo() {
   return menus ? `<div class="arbo-cascade" data-bloc="arbo">${menus}</div>` : ''
 }
 
+// ---------------------------------------------------------------- largeur des colonnes, défilement du haut
+
+// Les largeurs choisies (en pixels, par colonne) sont retenues sur ce poste. Dès qu'une largeur est réglée, le tableau
+// passe en largeurs fixes : le texte trop long d'une cellule est coupé (« … »), le détail de la pièce reste complet.
+let largeurs = {}
+try { largeurs = JSON.parse(localStorage.getItem('pdrtec-largeurs') || '{}') } catch {}
+const retenirLargeurs = () => { try { localStorage.setItem('pdrtec-largeurs', JSON.stringify(largeurs)) } catch {} }
+
+function appliquerLargeurs() {
+  const ths = [...$('thead').querySelectorAll('th[data-key]')]
+  const fixe = ths.some((t) => largeurs[t.dataset.key])
+  $('table').classList.toggle('largeurs-fixes', fixe)
+  $('colonnes').innerHTML = ths.map((t) => `<col style="${fixe ? `width:${largeurs[t.dataset.key] || 150}px` : ''}">`).join('')
+  $('table').style.width = fixe ? ths.reduce((s, t) => s + (largeurs[t.dataset.key] || 150), 0) + 'px' : ''
+  ths.forEach((t, i) => {
+    const poignee = t.querySelector('.poignee-col')
+    poignee.onclick = (e) => e.stopPropagation()
+    poignee.ondblclick = (e) => { e.stopPropagation(); largeurs = {}; retenirLargeurs(); appliquerLargeurs() }
+    poignee.onmousedown = (e) => {
+      e.preventDefault(); e.stopPropagation()
+      // Premier réglage : les largeurs actuelles de toutes les colonnes deviennent le point de départ.
+      if (!fixe) ths.forEach((x) => (largeurs[x.dataset.key] = x.offsetWidth))
+      const depart = e.clientX, largeur = largeurs[t.dataset.key] || t.offsetWidth
+      const col = () => $('colonnes').children[i]
+      appliquerLargeurs()
+      const bouger = (m) => {
+        largeurs[t.dataset.key] = Math.max(50, Math.round(largeur + m.clientX - depart))
+        col().style.width = largeurs[t.dataset.key] + 'px'
+        $('table').style.width = [...$('thead').querySelectorAll('th[data-key]')].reduce((s, x) => s + (largeurs[x.dataset.key] || 150), 0) + 'px'
+        majDefilHaut()
+      }
+      const lacher = () => { document.removeEventListener('mousemove', bouger); document.removeEventListener('mouseup', lacher); retenirLargeurs() }
+      document.addEventListener('mousemove', bouger)
+      document.addEventListener('mouseup', lacher)
+    }
+  })
+  majDefilHaut()
+}
+
+// La barre de défilement du haut suit celle du bas (et inversement) ; cachée si le tableau tient dans la largeur.
+function majDefilHaut() {
+  const boite = $('tablebox'), haut = $('defilHaut')
+  haut.firstElementChild.style.width = boite.scrollWidth + 'px'
+  haut.hidden = boite.scrollWidth <= boite.clientWidth + 1
+}
+function brancherDefilHaut() {
+  const boite = $('tablebox'), haut = $('defilHaut')
+  let suit = false
+  haut.onscroll = () => { if (suit) return; suit = true; boite.scrollLeft = haut.scrollLeft; suit = false }
+  boite.onscroll = () => { if (suit) return; suit = true; haut.scrollLeft = boite.scrollLeft; suit = false }
+  new ResizeObserver(majDefilHaut).observe(boite)
+  new ResizeObserver(majDefilHaut).observe($('table'))
+}
+
 // ---------------------------------------------------------------- mode configuration
 
 function basculerConfiguration(actif) {
@@ -928,13 +983,15 @@ function render() {
   const cols = [['code', 'Code'], ['des', 'Désignation'], ['empl', 'Emplacement'], ['famille', 'Famille'], ['sousfamille', 'Sous-famille']]
   const th = (key, label, isChar) => {
     const on = sortIsChar === isChar && sortKey === key
-    return `<th class="${isChar === 'x' ? 'extra' : isChar ? 'char' : ''}" data-key="${esc(key)}" data-char="${isChar === 'x' ? 'x' : isChar ? 1 : 0}">${esc(label)}${on ? (sortDir === 1 ? ' ▲' : ' ▼') : ''}</th>`
+    return `<th class="${isChar === 'x' ? 'extra' : isChar ? 'char' : ''}" data-key="${esc(key)}" data-char="${isChar === 'x' ? 'x' : isChar ? 1 : 0}">${esc(label)}${on ? (sortDir === 1 ? ' ▲' : ' ▼') : ''}<span class="poignee-col" title="Glisser pour régler la largeur ; double-clic : largeur automatique"></span></th>`
   }
   // Les colonnes des compléments (ex. le stock) au bout de chaque ligne.
   const extras = COLONNES_COMPLEMENTS
   const titreExtra = (c) => c.charAt(0).toUpperCase() + c.slice(1)
   $('thead').innerHTML = '<tr>' + cols.map(([k, l]) => th(k, l, false)).join('') + chars.map((c) => th(c, c, true)).join('') + extras.map((c) => th(c, titreExtra(c), 'x')).join('') + '</tr>'
-  $('thead').querySelectorAll('th[data-key]').forEach((t) => (t.onclick = () => {
+  appliquerLargeurs()
+  $('thead').querySelectorAll('th[data-key]').forEach((t) => (t.onclick = (e) => {
+    if (e.target.closest('.poignee-col')) return
     const key = t.dataset.key, isChar = t.dataset.char === 'x' ? 'x' : t.dataset.char === '1'
     if (sortKey === key && sortIsChar === isChar) sortDir *= -1; else { sortKey = key; sortIsChar = isChar; sortDir = 1 }
     render()
@@ -950,6 +1007,7 @@ function render() {
   if (res.length > 500) $('tbody').insertAdjacentHTML('beforeend', `<tr><td class="empty" colspan="${n}">500 premières pièces affichées · affine la recherche</td></tr>`)
   $('tbody').querySelectorAll('.cpy').forEach((b) => { b.onclick = (e) => { e.stopPropagation(); copyCode(b) }; b.onkeydown = (e) => e.stopPropagation() })
   $('tbody').querySelectorAll('tr.row').forEach((tr) => { const t = () => { tr.classList.toggle('open'); tr.nextElementSibling.hidden = !tr.classList.contains('open') }; tr.onclick = t; tr.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t() } } })
+  majDefilHaut()
 }
 
 // ---------------------------------------------------------------- photos et pièces jointes
@@ -1166,6 +1224,7 @@ function brancherEvenements() {
   $('stgReversible').onchange = () => { SETTINGS.reversible = $('stgReversible').checked; rsel = { A: {}, B: {} }; saveSettings(); render() }
   $('stgHideDeleted').onchange = () => { SETTINGS.masquerSupprimes = $('stgHideDeleted').checked; saveSettings(); render() }
   $('stgPropositions').onchange = () => { SETTINGS.propositions = $('stgPropositions').checked; appliquerPropositions(); sel = {}; csel = {}; saveSettings(); render() }
+  brancherDefilHaut()
   $('stgComplementsOk').onclick = async () => {
     try {
       await api('/api/complements/requete', { methode: 'POST', corps: { sql: $('stgComplements').value } })
