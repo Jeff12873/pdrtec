@@ -149,3 +149,44 @@
 .pdrtec .arbo-cascade { display: grid; gap: 8px; align-content: start; grid-column: span 2; min-width: 0; }
 .pdrtec .arbo-cascade .f { margin-left: calc(var(--niveau, 0) * 22px); }
 @media (max-width: 760px) { .pdrtec .arbo-cascade { grid-column: auto; } .pdrtec .arbo-cascade .f { margin-left: calc(var(--niveau, 0) * 10px); } }
+
+/* Coches Oui / Non, à droite des menus */
+.pdrtec .ligne-filtres { display: flex; gap: 18px; align-items: flex-start; }
+.pdrtec .ligne-filtres > .filters { flex: 1; min-width: 0; }
+@media (max-width: 900px) { .pdrtec .ligne-filtres { flex-direction: column; } }
+.pdrtec .coches-panel { display: grid; gap: 6px; align-content: start; padding-left: 18px; border-left: 1px solid var(--line); }
+.pdrtec .coche { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pdrtec .nom-coche { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pdrtec .segs { display: inline-flex; background: var(--chip); border-radius: 999px; padding: 2px; flex: none; }
+.pdrtec .seg { font: inherit; font-size: .8rem; border: 0; background: transparent; color: var(--fg); padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.pdrtec .seg small { color: var(--muted); font-size: .72rem; }
+.pdrtec .seg.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* Mode configuration */
+.pdrtec .bandeau-config { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 14px; border: 1px dashed var(--accent); background: var(--accent-soft); font-size: .88rem; }
+.pdrtec .bandeau-config span { flex: 1; min-width: 240px; }
+.pdrtec.en-configuration [data-bloc] { outline: 1px dashed var(--line); outline-offset: 3px; border-radius: 12px; cursor: grab; }
+.pdrtec.en-configuration [data-bloc]:hover { outline-color: var(--accent); }
+.pdrtec [data-bloc].tire { opacity: .4; }
+.pdrtec .description-fiche { grid-column: 1 / -1; margin: 0 0 10px; color: var(--muted); font-size: .9rem; white-space: normal; }
+.pdrtec textarea.description-fiche { width: 100%; box-sizing: border-box; min-height: 60px; font: inherit; color: var(--fg); background: var(--chip); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
+
+/* Menus avec images */
+.pdrtec .dd-zone { position: relative; min-width: 0; }
+.pdrtec .dd { appearance: none; font: inherit; font-size: .92rem; width: 100%; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: flex-start; gap: 8px; text-align: left;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%23889' stroke-width='1.6'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; color: var(--fg); background-color: var(--chip); border: 1px solid transparent; border-radius: 999px; padding: 6px 36px 6px 14px; min-height: 42px; cursor: pointer; }
+.pdrtec .dd span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdrtec .dd.on { background-color: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.pdrtec .dd img, .pdrtec .dd-choix img { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; flex: none; background: #fff; }
+.pdrtec .dd-liste { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); max-height: 340px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.4); padding: 4px; }
+.pdrtec .dd-choix { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: .9rem; }
+.pdrtec .dd-choix:hover { background: var(--chip); }
+.pdrtec .dd-choix.on { color: var(--accent); font-weight: 600; }
+.pdrtec .dd-choix span { flex: 1; }
+.pdrtec .dd-image { font: inherit; border: 1px solid var(--line); background: var(--chip); color: var(--fg); border-radius: 6px; padding: 0 6px; cursor: pointer; }
+
+/* Éditeur des coches */
+.pdrtec-dialog .edition-coche { border: 1px solid var(--bord); border-radius: 12px; padding: 10px; margin: 8px 0; display: grid; gap: 6px; }
+.pdrtec-dialog .ligne-coche, .pdrtec-dialog .ligne-regle { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pdrtec-dialog .ligne-coche input { flex: 1; min-width: 160px; }
+.pdrtec-dialog .ligne-regle input { flex: 1; min-width: 140px; }

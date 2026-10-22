@@ -5,7 +5,7 @@
 // même rapport BIRT, glissé sur la page (lu dans le navigateur, envoyé nulle part).
 // Les réglages (serveur des photos, pièces réversibles…) sont aussi dans le .ktec : les mêmes sur tous les postes.
 
-import { api } from '/socle/api.js'
+import { api, adresse } from '/socle/api.js'
 import { etat } from '/socle/etat.js'
 import { demanderMotDePasse } from '/socle/connexion.js'
 import { notifier } from '/socle/ui.js'
@@ -52,16 +52,25 @@ const PAGE = `
       <button class="btn primary" id="actualiser" type="button">Actualiser depuis la base</button>
       <label class="btn" for="file">Charger un export BIRT</label>
       <input type="file" id="file" accept=".xls,.xlsx,.csv" multiple hidden>
+      <button class="btn" id="configBtn" type="button" title="Ranger les menus, ajouter des images aux choix, décrire les fiches, régler les coches">Configurer l'affichage</button>
       <button class="btn" id="settingsBtn" type="button">Paramètres</button>
     </div>
   </header>
 
   <section class="panel">
+    <div class="bandeau-config" id="bandeauConfig" hidden>
+      <span><b>Mode configuration</b> : glisse les menus pour les ranger (sur la grille), ajoute une image à côté d'un choix (bouton ▣ dans la liste), décris la fiche sous « Caractéristiques », règle les coches.</span>
+      <button class="btn small" id="dispositionDefaut" type="button">Disposition par défaut</button>
+      <button class="btn small primary" id="finConfig" type="button">Terminer</button>
+    </div>
     <div class="search">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="q" type="search" placeholder="Code, désignation, référence fabricant, observation…" autocomplete="off">
     </div>
-    <div class="filters" id="filters"></div>
+    <div class="ligne-filtres">
+      <div class="filters" id="filters"></div>
+      <div id="coches"></div>
+    </div>
     <div class="group" id="chargroup">
       <h2 id="chartitle"></h2>
       <div class="filters" id="charfilters"></div>
@@ -85,6 +94,9 @@ const PAGE = `
     <li><b>Rechercher</b> : tape un code, une désignation ou une référence fabricant dans la barre. Plusieurs mots se combinent (ex. « detect 24 »), les accents sont ignorés. Mets une expression entre guillemets pour la chercher telle quelle : <code>"REP 19"</code> trouve « REP 19 » mais pas « REP 190 » ni « REP 2 … 19 ».</li>
     <li><b>Filtrer en cascade</b> : choisis une famille puis une sous-famille. Chaque liste ne propose que les valeurs encore possibles. Le modèle de fiche technique se détermine automatiquement à partir de la sous-famille, il n'y a rien à choisir.</li>
     <li><b>Filtrer sur les caractéristiques</b> : une fois la sous-famille choisie, ses caractéristiques (tension, diamètre…) apparaissent en dessous et deviennent des colonnes du tableau. Pour les modèles activés dans Paramètres, un champ Tension unique remplace les bornes mini/maxi.</li>
+    <li><b>Ligne / arborescence</b> : les pièces montées sur une ligne, un sous-ensemble, une machine, menu après menu (arborescence de la GMAO).</li>
+    <li><b>Coches à droite</b> (Supprimée, et celles réglées dans « Configurer l'affichage ») : Tous, Oui ou Non, avec le nombre de pièces.</li>
+    <li><b>Configurer l'affichage</b> : glisser les menus pour les ranger, « Disposition par défaut » pour revenir à l'ordre d'origine, ajouter une image à côté d'un choix (▣ dans la liste), écrire une description sous « Caractéristiques », régler les coches.</li>
     <li><b>Trier le tableau</b> : clique sur l'en-tête d'une colonne pour trier (▲/▼), reclique pour inverser le sens.</li>
     <li><b>Voir le détail</b> : clique sur une pièce pour afficher sa photo (si disponible), son emplacement, son observation complète, ses machines, ses pièces jointes et toutes ses caractéristiques. Clique sur une pièce jointe pour l'ouvrir.</li>
     <li><b>Copier un code</b> : clique sur la petite icône à droite du code d'une pièce pour le mettre dans le presse-papier (elle passe à ✓ une fois copié).</li>
@@ -139,6 +151,14 @@ const PAGE = `
       <button class="btn small" id="stgRequeteOk" type="button">Enregistrer la requête</button>
       <label class="btn small" for="stgRptdesign">La lire dans un rapport BIRT (.rptdesign)</label>
       <input type="file" id="stgRptdesign" accept=".rptdesign" hidden>
+    </div>
+  </div>
+  <div class="stgrow">
+    <label for="stgComplements">Compléments (stock…)</label>
+    <p class="note">Requête facultative : une ligne par pièce, une colonne codePiece et d'autres colonnes (ex. stock). Ces colonnes peuvent être testées par les coches (« Configurer l'affichage » › « Régler les coches »).</p>
+    <textarea id="stgComplements" class="stginput" spellcheck="false" placeholder="SELECT … AS codePiece, … AS stock …"></textarea>
+    <div class="actions" style="justify-content:flex-start">
+      <button class="btn small" id="stgComplementsOk" type="button">Enregistrer la requête des compléments</button>
     </div>
   </div>
   <div class="stgrow">
@@ -222,11 +242,19 @@ let PIECES = [], sel = {}, csel = {}, q = '', Q = []
 // sont cherchées comme une paire sans ordre : côté A + côté B, dans un sens ou dans l'autre.
 let rsel = { A: {}, B: {} }, REV = null
 let lastModel = null, sortKey = 'des', sortIsChar = false, sortDir = 1, tKeyMini = null, tKeyMaxi = null, tensionVal = ''
-let SETTINGS = { serveur: '', modeleLien: '', reversible: false, masquerSupprimes: false, modelesTension: [], propositions: true }
+let SETTINGS = { serveur: '', modeleLien: '', reversible: false, masquerSupprimes: false, modelesTension: [], propositions: true, coches: [], disposition: { principaux: [], caracteristiques: {} }, descriptions: {}, images: {} }
+// Compléments (requête facultative des Paramètres) : par code pièce, { colonne: valeur }. Colonnes connues.
+let COMPLEMENTS = new Map(), COLONNES_COMPLEMENTS = []
+// Coches Oui / Non : état de chacune (« tous », « oui », « non »), « supprimees » comprise.
+let cochesEtat = {}
+// Mode configuration : déplacer les menus, décrire une fiche, ajouter des images aux choix, régler les coches.
+let configuration = false
 let requeteReglee = false
 // Arborescence des machines : nœuds (Map id → { id, parent, code, desi, ordre, enfants }), liens pièce → machines,
 // et la suite des nœuds choisis dans les menus en cascade (du haut vers le bas).
 let ARBO = null, asel = []
+// Les fiches techniques de la sous-famille choisie (la plus utilisée d'abord) : leurs caractéristiques sont proposées.
+let MODELES = []
 let ecouteDefilement = false
 
 // ---------------------------------------------------------------- démarrage de l'écran
@@ -236,6 +264,8 @@ async function demarrer() {
   requeteReglee = Boolean(lus.requete)
   SETTINGS = { ...SETTINGS, ...lus }
   $('stgRequete').value = lus.requete || ''
+  $('stgComplements').value = lus.complements || ''
+  cochesEtat.supprimees = SETTINGS.masquerSupprimes ? 'non' : 'tous'
   $('stgArbre').value = lus.arborescence?.arbre || ''
   $('stgLiens').value = lus.arborescence?.liens || ''
   brancherEvenements()
@@ -258,11 +288,13 @@ async function chargerDepuisLaBase(rafraichir) {
   }
   $('source').textContent = rafraichir ? 'Lecture de la base…' : 'Chargement des pièces…'
   try {
-    const [d, a] = await Promise.all([
+    const [d, c, a] = await Promise.all([
       api(`/api/donnees${rafraichir ? '?rafraichir=1' : ''}`),
+      api(`/api/complements${rafraichir ? '?rafraichir=1' : ''}`).catch((erreur) => { notifier(`Compléments : ${erreur.message}`, 'erreur'); return null }),
       api(`/api/arborescence${rafraichir ? '?rafraichir=1' : ''}`).catch((erreur) => { notifier(`Arborescence : ${erreur.message}`, 'erreur'); return null }),
     ])
     chargerArbo(a)
+    chargerComplements(c)
     const date = new Date(d.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
     fromAOA([d.colonnes, ...d.lignes], `base de la GMAO, lue le ${date}${d.tronque ? ' (liste tronquée)' : ''}`)
   } catch (erreur) {
@@ -281,14 +313,14 @@ let minuterieReglages
 function saveSettings() {
   clearTimeout(minuterieReglages)
   minuterieReglages = setTimeout(() => {
-    const { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions } = SETTINGS
-    api('/api/reglages', { methode: 'POST', corps: { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions } }).catch(() => {})
+    const { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions, coches, disposition, descriptions, images } = SETTINGS
+    api('/api/reglages', { methode: 'POST', corps: { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions, coches, disposition, descriptions, images } }).catch(() => {})
   }, 400)
 }
 
 // ---------------------------------------------------------------- pièces réversibles
 
-function catOfK(k) { for (const p of PIECES) { if (p.modele === sel.modele && p.carCat[k]) return p.carCat[k] } return '' }
+function catOfK(k) { for (const p of PIECES) { if (MODELES.includes(p.modele) && p.carCat[k]) return p.carCat[k] } return '' }
 function shortLabelK(k, cat) { const pre = cat + ' :'; return cat && norm(k).startsWith(norm(pre)) ? k.slice(pre.length).trim() : k }
 function twinInfo(chars) {
   if (!SETTINGS.reversible || !sel.modele) return null
@@ -374,7 +406,7 @@ function fromAOA(aoa, label) {
   })
   PIECES = [...map.values()]
   PIECES.forEach((p) => { const pr = emplParts(p.empl); p.deleted = pr.length > 0 && pr.every(isDeletedEmpl) })
-  PIECES.forEach((p) => { p.familleGmao = p.famille; p.sousfamilleGmao = p.sousfamille })
+  PIECES.forEach((p) => { p.familleGmao = p.famille; p.sousfamilleGmao = p.sousfamille; p.extra = COMPLEMENTS.get(p.code) || {} })
   rattacherArbo()
   proposerFamilles()
   appliquerPropositions()
@@ -537,15 +569,216 @@ function menusArbo() {
     // Le nœud choisi reste affiché même si la recherche ne trouve plus de pièce dessous.
     const choix = liste.filter((n) => compte.get(n.id) || n.id === courant).sort(parOrdre)
     if (!choix.length) return ''
-    return `<div class="f" style="--niveau:${i}"><label for="a_${i}">${i ? '└ Dans ' + esc(ARBO.noeuds.get(asel[i - 1])?.code || '') : 'Ligne / arborescence'}</label><select id="a_${i}" data-a="${i}" class="${courant ? 'on' : ''}"><option value="">Tous</option>${choix.map((n) => `<option value="${esc(n.id)}"${n.id === courant ? ' selected' : ''}>${esc(libelleNoeud(n))} (${compte.get(n.id) || 0})</option>`).join('')}</select></div>`
+    return `<div class="f" style="--niveau:${i}" data-fixe="1"><label for="a_${i}">${i ? '└ Dans ' + esc(ARBO.noeuds.get(asel[i - 1])?.code || '') : 'Ligne / arborescence'}</label><select id="a_${i}" data-a="${i}" class="${courant ? 'on' : ''}"><option value="">Tous</option>${choix.map((n) => `<option value="${esc(n.id)}"${n.id === courant ? ' selected' : ''}>${esc(libelleNoeud(n))} (${compte.get(n.id) || 0})</option>`).join('')}</select></div>`
   }).join('')
-  return menus ? `<div class="arbo-cascade">${menus}</div>` : ''
+  return menus ? `<div class="arbo-cascade" data-bloc="arbo">${menus}</div>` : ''
+}
+
+// ---------------------------------------------------------------- mode configuration
+
+function basculerConfiguration(actif) {
+  configuration = actif
+  $('bandeauConfig').hidden = !actif
+  document.querySelector('.pdrtec').classList.toggle('en-configuration', actif)
+  render()
+}
+
+// Des blocs { id } dans l'ordre enregistré ; les nouveaux (absents de l'ordre) gardent leur place, à la suite.
+function ordonner(blocs, ordre) {
+  if (!ordre?.length) return blocs
+  const rang = (id) => { const i = ordre.indexOf(id); return i < 0 ? ordre.length + blocs.findIndex((b) => b.id === id) : i }
+  return [...blocs].sort((a, b) => rang(a.id) - rang(b.id))
+}
+
+// Glisser-déposer des menus (mode configuration) : l'ordre est enregistré pour les menus du haut, et par fiche
+// pour les caractéristiques. La grille garde l'alignement.
+function brancherConfiguration() {
+  if (!configuration) return
+  const zones = [$('filters'), ...$('charfilters').querySelectorAll('.filters'), $('charfilters')]
+  let tire = null
+  for (const zone of zones) {
+    for (const el of zone.querySelectorAll(':scope > [data-bloc]')) {
+      el.draggable = true
+      el.ondragstart = (e) => { tire = el; el.classList.add('tire'); e.dataTransfer.effectAllowed = 'move' }
+      el.ondragend = () => { el.classList.remove('tire'); tire = null }
+      el.ondragover = (e) => {
+        if (!tire || tire === el || tire.parentNode !== el.parentNode) return
+        e.preventDefault()
+        const r = el.getBoundingClientRect()
+        const apres = e.clientY > r.bottom - r.height / 3 || (e.clientY > r.top && e.clientX > r.left + r.width / 2)
+        el.parentNode.insertBefore(tire, apres ? el.nextSibling : el)
+      }
+      el.ondrop = (e) => {
+        e.preventDefault()
+        if (zone === $('filters')) SETTINGS.disposition = { ...SETTINGS.disposition, principaux: [...$('filters').querySelectorAll(':scope > [data-bloc]')].map((x) => x.dataset.bloc) }
+        else if (sel.modele) SETTINGS.disposition = { ...SETTINGS.disposition, caracteristiques: { ...(SETTINGS.disposition?.caracteristiques || {}), [sel.modele]: [...$('charfilters').querySelectorAll('.f[data-bloc]')].map((x) => x.dataset.bloc) } }
+        saveSettings()
+      }
+    }
+  }
+}
+
+// Les menus deviennent des listes avec images quand des images ont été ajoutées à leurs choix
+// (et toujours en mode configuration, pour pouvoir en ajouter). Le vrai menu reste caché derrière : son état ne change pas.
+function ameliorerMenus() {
+  document.querySelectorAll('.pdrtec select[data-img]').forEach((s) => {
+    const cle = s.dataset.img
+    const avecImages = Object.keys(SETTINGS.images || {}).some((k) => k.startsWith(cle + '\u0001'))
+    if (!avecImages && !configuration) return
+    const imageDe = (v) => { const n = SETTINGS.images?.[cle + '\u0001' + v]; return n ? `<img src="${esc(adresse(`/api/images/${encodeURIComponent(n)}`))}" alt="">` : '' }
+    const zone = document.createElement('div')
+    zone.className = 'dd-zone'
+    const choisi = s.options[s.selectedIndex]
+    zone.innerHTML = `<button type="button" class="dd ${s.className}">${choisi && choisi.value ? imageDe(choisi.value) : ''}<span>${esc(choisi?.text || 'Tous')}</span></button><div class="dd-liste" hidden>${[...s.options].map((o) => `<div class="dd-choix${o.selected ? ' on' : ''}" data-v="${esc(o.value)}">${o.value ? imageDe(o.value) : ''}<span>${esc(o.text)}</span>${configuration && o.value ? `<button type="button" class="dd-image" title="${SETTINGS.images?.[cle + '\u0001' + o.value] ? 'Retirer l’image' : 'Ajouter une image'}">${SETTINGS.images?.[cle + '\u0001' + o.value] ? '✕' : '▣'}</button>` : ''}</div>`).join('')}</div>`
+    s.hidden = true
+    s.after(zone)
+    const liste = zone.querySelector('.dd-liste')
+    zone.querySelector('.dd').onclick = () => { const ouvert = !liste.hidden; document.querySelectorAll('.dd-liste').forEach((l) => (l.hidden = true)); liste.hidden = ouvert }
+    liste.querySelectorAll('.dd-choix').forEach((c) => (c.onclick = (e) => {
+      const v = c.dataset.v
+      if (e.target.closest('.dd-image')) return void changerImage(cle, v)
+      s.value = v
+      s.dispatchEvent(new Event('change'))
+    }))
+  })
+}
+
+// Ajoute (ou retire) l'image d'un choix : envoyée au serveur, rangée dans le fichier de connaissances.
+function changerImage(cle, valeur) {
+  const k = cle + '\u0001' + valeur
+  if (SETTINGS.images?.[k]) {
+    const images = { ...SETTINGS.images }
+    delete images[k]
+    SETTINGS.images = images
+    saveSettings(); render()
+    return
+  }
+  const choix = document.createElement('input')
+  choix.type = 'file'
+  choix.accept = '.png,.jpg,.jpeg,.gif,.webp,.svg'
+  choix.onchange = async () => {
+    const fichier = choix.files[0]
+    if (!fichier) return
+    try {
+      const r = await api('/api/images', { methode: 'POST', fichier, entetes: { 'X-Nom': encodeURIComponent(fichier.name) } })
+      SETTINGS.images = { ...SETTINGS.images, [k]: r.nom }
+      saveSettings(); render()
+    } catch (erreur) {
+      notifier(erreur.message, 'erreur')
+    }
+  }
+  choix.click()
+}
+
+// L'éditeur des coches : un nom, des règles (champ, test, valeurs séparées par des virgules), liées par OU ou ET.
+function editerCoches() {
+  let coches = structuredClone(SETTINGS.coches || [])
+  const champs = { ...CHAMPS_PIECE, ...Object.fromEntries(COLONNES_COMPLEMENTS.map((c) => [c, `${c} (compléments)`])) }
+  const dlg = document.createElement('dialog')
+  dlg.className = 'pdrtec-dialog'
+  const options_ = (o, v) => Object.entries(o).map(([k, t]) => `<option value="${esc(k)}"${k === v ? ' selected' : ''}>${esc(t)}</option>`).join('')
+  const dessiner = () => {
+    dlg.innerHTML = `<div class="dhead"><h2>Les coches</h2><button class="btn small" data-a="fermer" type="button">Fermer</button></div>
+      <p class="note">Chaque coche se règle ensuite sur Tous / Oui / Non. Une pièce est « Oui » si l'une des règles est vraie (OU), ou toutes (ET). Plusieurs valeurs : séparées par des virgules.${COLONNES_COMPLEMENTS.length ? '' : ' Pour tester le stock, ajoutez d’abord la requête des compléments dans les Paramètres.'}</p>
+      ${coches.map((c, i) => `<div class="edition-coche">
+        <div class="ligne-coche"><input type="text" value="${esc(c.nom)}" data-i="${i}" data-c="nom" placeholder="Nom de la coche"><select data-i="${i}" data-c="lien"><option value="ou"${c.lien !== 'et' ? ' selected' : ''}>une règle suffit (OU)</option><option value="et"${c.lien === 'et' ? ' selected' : ''}>toutes les règles (ET)</option></select><button class="btn small" type="button" data-a="retirer" data-i="${i}">Retirer</button></div>
+        ${(c.regles || []).map((r, j) => `<div class="ligne-regle"><select data-i="${i}" data-j="${j}" data-r="champ">${options_(champs, r.champ)}</select><select data-i="${i}" data-j="${j}" data-r="test">${options_(TESTS, r.test)}</select><input type="text" value="${esc((r.valeurs || []).join(', '))}" data-i="${i}" data-j="${j}" data-r="valeurs" placeholder="valeurs"><button class="btn small" type="button" data-a="retirer-regle" data-i="${i}" data-j="${j}">✕</button></div>`).join('')}
+        <button class="btn small" type="button" data-a="regle" data-i="${i}">+ Règle</button>
+      </div>`).join('')}
+      <div class="actions" style="justify-content:flex-start"><button class="btn small" type="button" data-a="ajouter">+ Coche</button><button class="btn small primary" type="button" data-a="enregistrer">Enregistrer</button></div>`
+  }
+  dlg.addEventListener('change', (e) => {
+    const t = e.target, i = Number(t.dataset.i)
+    if (t.dataset.c) coches[i][t.dataset.c] = t.value
+    if (t.dataset.r) coches[i].regles[Number(t.dataset.j)][t.dataset.r] = t.dataset.r === 'valeurs' ? t.value.split(',').map((v) => v.trim()).filter(Boolean) : t.value
+  })
+  dlg.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-a]')
+    if (!b) return
+    const i = Number(b.dataset.i)
+    if (b.dataset.a === 'fermer') return dlg.close()
+    if (b.dataset.a === 'ajouter') coches.push({ id: 'c' + Date.now().toString(36), nom: 'Nouvelle coche', lien: 'ou', regles: [{ champ: 'code', test: 'commence', valeurs: [] }] })
+    if (b.dataset.a === 'retirer') coches.splice(i, 1)
+    if (b.dataset.a === 'regle') coches[i].regles.push({ champ: 'code', test: 'commence', valeurs: [] })
+    if (b.dataset.a === 'retirer-regle') coches[i].regles.splice(Number(b.dataset.j), 1)
+    if (b.dataset.a === 'enregistrer') {
+      SETTINGS.coches = coches.filter((c) => c.nom.trim())
+      saveSettings(); dlg.close(); render()
+      return notifier('Coches enregistrées')
+    }
+    dessiner()
+  })
+  dlg.addEventListener('close', () => dlg.remove())
+  dessiner()
+  document.body.append(dlg)
+  dlg.showModal()
+}
+
+// ---------------------------------------------------------------- compléments et coches
+
+function chargerComplements(c) {
+  COMPLEMENTS = new Map(); COLONNES_COMPLEMENTS = []
+  if (!c?.colonnes?.length) return
+  const iCode = c.colonnes.findIndex((n) => n.toLowerCase() === 'codepiece')
+  COLONNES_COMPLEMENTS = c.colonnes.filter((_, i) => i !== iCode)
+  for (const l of c.lignes) {
+    const o = {}
+    c.colonnes.forEach((n, i) => { if (i !== iCode) o[n] = l[i] })
+    COMPLEMENTS.set(clean(l[iCode]), o)
+  }
+}
+
+const CHAMPS_PIECE = { code: 'Code', des: 'Désignation', empl: 'Emplacement', obs: 'Observation', obsMachine: 'Observation machine', famille: 'Famille', sousfamille: 'Sous-famille' }
+const TESTS = { commence: 'commence par', contient: 'contient', egal: 'est', superieur: 'supérieur à', inferieur: 'inférieur à', vide: 'est vide', non_vide: 'n’est pas vide' }
+
+// Une règle : le champ (de la pièce ou des compléments), un test, des valeurs (l'une suffit).
+// L'emplacement peut en avoir plusieurs (« ; ») : la règle est vraie si l'un d'eux la vérifie.
+function regleVraie(p, r) {
+  const brut = r.champ in CHAMPS_PIECE ? p[r.champ] : p.extra?.[r.champ]
+  const textes = r.champ === 'empl' ? emplParts(brut) : [String(brut ?? '')]
+  const valeurs = (r.valeurs || []).map((v) => String(v).trim()).filter(Boolean)
+  return textes.some((t) => {
+    const n = norm(t).trim()
+    switch (r.test) {
+      case 'vide': return !n
+      case 'non_vide': return Boolean(n)
+      case 'superieur': return n !== '' && valeurs.some((v) => Number(t.replace(',', '.')) > Number(v.replace(',', '.')))
+      case 'inferieur': return n !== '' && valeurs.some((v) => Number(t.replace(',', '.')) < Number(v.replace(',', '.')))
+      case 'egal': return valeurs.some((v) => n === norm(v))
+      case 'contient': return valeurs.some((v) => n.includes(norm(v)))
+      default: return valeurs.some((v) => n.startsWith(norm(v)))
+    }
+  })
+}
+function cocheVraie(p, c) {
+  const regles = (c.regles || []).filter((r) => r.champ && r.test)
+  if (!regles.length) return false
+  return c.lien === 'et' ? regles.every((r) => regleVraie(p, r)) : regles.some((r) => regleVraie(p, r))
+}
+
+// Les coches à droite des menus : « Supprimée », puis celles des réglages. Chaque coche : Tous / Oui / Non.
+function panneauCoches() {
+  const toutes = [{ id: 'supprimees', nom: 'Supprimée' }, ...(SETTINGS.coches || [])]
+  const lignes = toutes.map((c) => {
+    const e = cochesEtat[c.id] || 'tous'
+    const base = PIECES.filter((p) => match(p, 'coche:' + c.id))
+    const oui = c.id === 'supprimees' ? base.filter((p) => p.deleted).length : base.filter((p) => cocheVraie(p, c)).length
+    const bouton = (v, texte, n) => `<button type="button" class="seg${e === v ? ' on' : ''}" data-coche="${esc(c.id)}" data-v="${v}">${texte}${n !== null ? ` <small>${n}</small>` : ''}</button>`
+    return `<div class="coche"><span class="nom-coche" title="${esc(c.nom)}">${esc(c.nom)}</span><span class="segs">${bouton('tous', 'Tous', null)}${bouton('oui', 'Oui', oui)}${bouton('non', 'Non', base.length - oui)}</span></div>`
+  }).join('')
+  return `<div class="coches-panel">${configuration ? '<button type="button" class="btn small" id="editerCoches">Régler les coches…</button>' : ''}${lignes}</div>`
 }
 
 function match(p, skipMain, skipChar) {
-  if (SETTINGS.masquerSupprimes && p.deleted) return false
+  if (skipMain !== 'coche:supprimees' && cochesEtat.supprimees === 'non' && p.deleted) return false
+  if (skipMain !== 'coche:supprimees' && cochesEtat.supprimees === 'oui' && !p.deleted) return false
+  for (const c of SETTINGS.coches || []) {
+    const e = cochesEtat[c.id]
+    if (!e || e === 'tous' || skipMain === 'coche:' + c.id) continue
+    if (cocheVraie(p, c) !== (e === 'oui')) return false
+  }
   if (Q.length && !Q.every((t) => (t.re ? t.re.test(p.__t) : p.__t.includes(t.w)))) return false
-  for (const k in sel) { if (k !== skipMain && p[k] !== sel[k]) return false }
+  for (const k in sel) { if (k !== skipMain && k !== 'modele' && p[k] !== sel[k]) return false }
   if (asel.length && skipMain !== 'arbo' && !p.arbo?.has(asel.at(-1))) return false
   for (const k in csel) { if (k !== skipChar && (p.car[k] ?? '') !== csel[k]) return false }
   if (revActive() && !revAssign(p, skipChar && typeof skipChar === 'object' ? skipChar : null).length) return false
@@ -565,31 +798,46 @@ function options(values, current) {
   return '<option value="">Tous</option>' + vals.map((v) => `<option value="${esc(v)}"${v === current ? ' selected' : ''}>${esc(v)}</option>`).join('')
 }
 // Caractéristiques du modèle choisi
+// (toutes les fiches de la sous-famille : une pièce sans fiche, ou d'une autre fiche, ne les fait pas disparaître)
 function modelChars() {
-  if (!sel.modele) return []
-  const s = new Set(); PIECES.forEach((p) => { if (p.modele === sel.modele) Object.keys(p.car).forEach((k) => s.add(k)) })
+  if (!MODELES.length) return []
+  const s = new Set(); PIECES.forEach((p) => { if (MODELES.includes(p.modele)) Object.keys(p.car).forEach((k) => s.add(k)) })
   return [...s]
 }
 function render() {
   // Le modèle fiche technique n'est jamais choisi à la main : il découle de la seule taxonomie famille/sous-famille
   // (il ne peut y en avoir qu'un) — indépendamment des filtres de caractéristiques ou de la recherche texte,
   // pour éviter qu'un filtre transitoire (tension, recherche…) ne fasse disparaître/réapparaître le modèle
+  // Les fiches de la sous-famille, la plus utilisée d'abord ; les pièces sans fiche sont ignorées ici.
   if (sel.sousfamille) {
-    const opts = [...new Set(PIECES.filter((p) => { for (const k in sel) { if (k !== 'modele' && p[k] !== sel[k]) return false } return true }).map((p) => p.modele))]
-    const auto = opts.length === 1 ? opts[0] : undefined
+    const compte = new Map()
+    PIECES.forEach((p) => { for (const k in sel) { if (k !== 'modele' && p[k] !== sel[k]) return } if (p.modele && p.modele !== NA) compte.set(p.modele, (compte.get(p.modele) || 0) + 1) })
+    MODELES = [...compte].sort((a, b) => b[1] - a[1]).map(([m]) => m)
+    const auto = MODELES[0]
     if (sel.modele !== auto) { auto ? (sel.modele = auto) : delete sel.modele; csel = {}; rsel = { A: {}, B: {} } }
-  } else if (sel.modele) { delete sel.modele; csel = {}; rsel = { A: {}, B: {} } }
+  } else {
+    MODELES = []
+    if (sel.modele) { delete sel.modele; csel = {}; rsel = { A: {}, B: {} } }
+  }
   REV = twinInfo(modelChars()); if (!REV) rsel = { A: {}, B: {} }
 
   // Filtres principaux
-  $('filters').innerHTML = MAIN.map(([k, l]) => `<div class="f"><label for="m_${k}">${l}</label><select id="m_${k}" data-k="${k}" class="${sel[k] ? 'on' : ''}">${options(PIECES.filter((p) => match(p, k)).map((p) => p[k]), sel[k])}</select></div>`).join('')
-  $('filters').insertAdjacentHTML('beforeend', menusArbo())
+  // Les blocs du haut (familles, arborescence, coches), dans l'ordre choisi en mode configuration.
+  const blocs = [
+    ...MAIN.map(([k, l]) => ({ id: k, html: `<div class="f" data-bloc="${k}"><label for="m_${k}">${l}</label><select id="m_${k}" data-k="${k}" data-img="m:${k}" class="${sel[k] ? 'on' : ''}">${options(PIECES.filter((p) => match(p, k)).map((p) => p[k]), sel[k])}</select></div>` })),
+    { id: 'arbo', html: menusArbo() },
+  ].filter((b) => b.html)
+  $('filters').innerHTML = ordonner(blocs, SETTINGS.disposition?.principaux).map((b) => b.html).join('')
+  $('coches').innerHTML = panneauCoches()
+  $('coches').querySelectorAll('button[data-coche]').forEach((b) => (b.onclick = () => { cochesEtat[b.dataset.coche] = b.dataset.v; render() }))
+  if ($('editerCoches')) $('editerCoches').onclick = editerCoches
   $('filters').querySelectorAll('select[data-k]').forEach((s) => (s.onchange = () => { const k = s.dataset.k; s.value ? (sel[k] = s.value) : delete sel[k]; render() }))
   // Choisir un nœud garde ceux du dessus et efface ceux du dessous.
   $('filters').querySelectorAll('select[data-a]').forEach((s) => (s.onchange = () => { const i = Number(s.dataset.a); asel = asel.slice(0, i); if (s.value) asel.push(s.value); render() }))
   // Caractéristiques : n'apparaissent qu'une fois le modèle déterminé
   const chars = modelChars()
-  $('chartitle').innerHTML = sel.modele ? (chars.length ? `Caractéristiques · <b>${esc(sel.modele)}</b>` : `Aucune caractéristique renseignée pour <b>${esc(sel.modele)}</b>`) : 'Choisis une sous-famille pour filtrer sur ses caractéristiques'
+  const autres = MODELES.length > 1 ? ` <span class="na">(+ ${MODELES.length - 1} autre${MODELES.length > 2 ? 's' : ''} fiche${MODELES.length > 2 ? 's' : ''})</span>` : ''
+  $('chartitle').innerHTML = sel.modele ? (chars.length ? `Caractéristiques · <b>${esc(sel.modele)}</b>${autres}` : `Aucune caractéristique renseignée pour <b>${esc(sel.modele)}</b>`) : 'Choisis une sous-famille pour filtrer sur ses caractéristiques'
 
   // Modèle activé dans Paramètres avec tension mini/maxi renseignée : un seul champ « Tension » remplace les deux pastilles
   const tensionOn = !!(sel.modele && SETTINGS.modelesTension.includes(sel.modele))
@@ -612,10 +860,14 @@ function render() {
   filterChars.forEach((k) => { const c = catOf(k); if (!fGroups.has(c)) fGroups.set(c, []); fGroups.get(c).push(k) })
   if (tensionMode && !fGroups.has(tensionCat)) fGroups.set(tensionCat, [])
   let fi = 0
-  const groupHtml = (cat, keys) => keys.map((k) => {
-    const i = fi++
+  // Une caractéristique sans aucune valeur pour les pièces encore possibles est masquée
+  // (ex. les dimensions des détecteurs rectangulaires quand la forme choisie est cylindrique).
+  const ordreFiche = SETTINGS.disposition?.caracteristiques?.[sel.modele]
+  const groupHtml = (cat, keys) => ordonner(keys.map((k) => ({ id: k })), ordreFiche).map(({ id: k }) => {
     const vals = PIECES.filter((p) => match(p, null, k)).map((p) => p.car[k]).filter((v) => v)
-    return `<div class="f"><label for="c_${i}" title="${esc(k)}">${esc(shortLabel(k, cat))}</label><select id="c_${i}" data-k="${esc(k)}" class="${csel[k] ? 'on' : ''}">${options(vals, csel[k])}</select></div>`
+    if (!vals.length && !csel[k] && !configuration) return ''
+    const i = fi++
+    return `<div class="f" data-bloc="${esc(k)}"><label for="c_${i}" title="${esc(k)}">${esc(shortLabel(k, cat))}</label><select id="c_${i}" data-k="${esc(k)}" data-img="c:${esc(k)}" class="${csel[k] ? 'on' : ''}">${options(vals, csel[k])}</select></div>`
   }).join('') + (tensionMode && cat === tensionCat ? tensionHtml : '')
   const onlyNoCat = fGroups.size <= 1 && (fGroups.size === 0 || fGroups.has(''))
   // Côtés A / B (pièces réversibles) : valeurs possibles calculées dans les deux sens
@@ -630,8 +882,14 @@ function render() {
     const i = fi++
     return `<div class="f"><label for="c_${i}" title="${esc(L.label)}">${esc(L.label)}</label><select id="c_${i}" data-rs="${sd}" data-rn="${esc(L.n)}" class="${rsel[sd][L.n] ? 'on' : ''}">${options(revVals(sd, L.n), rsel[sd][L.n])}</select></div>`
   }).join('')}</div></div>`).join('') : ''
-  $('charfilters').innerHTML = (onlyNoCat ? groupHtml('', fGroups.get('') || [])
-    : [...fGroups].map(([cat, keys]) => `<div class="fgroup"><div class="kcat">${esc(cat || 'Autres')}</div><div class="filters">${groupHtml(cat, keys)}</div></div>`).join('')) + revHtml
+  const description = sel.modele && (configuration
+    ? `<textarea id="descriptionFiche" class="description-fiche" placeholder="Description de la fiche « ${esc(sel.modele)} » (affichée ici, sous Caractéristiques)">${esc(SETTINGS.descriptions?.[sel.modele] || '')}</textarea>`
+    : SETTINGS.descriptions?.[sel.modele] ? `<p class="description-fiche">${esc(SETTINGS.descriptions[sel.modele]).replace(/\n/g, '<br>')}</p>` : '')
+  $('charfilters').innerHTML = (description || '') + (onlyNoCat ? groupHtml('', fGroups.get('') || [])
+    : [...fGroups].map(([cat, keys]) => { const html = groupHtml(cat, keys); return html ? `<div class="fgroup"><div class="kcat">${esc(cat || 'Autres')}</div><div class="filters">${html}</div></div>` : '' }).join('')) + revHtml
+  if ($('descriptionFiche')) $('descriptionFiche').onchange = (e) => { SETTINGS.descriptions = { ...SETTINGS.descriptions, [sel.modele]: e.target.value.trim() }; saveSettings() }
+  brancherConfiguration()
+  ameliorerMenus()
   $('charfilters').querySelectorAll('select[data-k]').forEach((s) => (s.onchange = () => { const k = s.dataset.k; s.value ? (csel[k] = s.value) : delete csel[k]; render() }))
   $('charfilters').querySelectorAll('select[data-rs]').forEach((s) => (s.onchange = () => { const sd = s.dataset.rs, n = s.dataset.rn; s.value ? (rsel[sd][n] = s.value) : delete rsel[sd][n]; render() }))
   const tIn = $('tension')
@@ -657,7 +915,7 @@ function render() {
     if (ea && eb) return 0; if (ea) return 1; if (eb) return -1
     return sortDir * String(va).localeCompare(String(vb), 'fr', { numeric: true })
   })
-  const nHidden = SETTINGS.masquerSupprimes ? PIECES.filter((p) => p.deleted).length : 0
+  const nHidden = 0
   $('count').innerHTML = `<b>${res.length}</b> / ${PIECES.length - nHidden} pièces` + (nHidden ? ` · ${nHidden} supprimée${nHidden > 1 ? 's' : ''} masquée${nHidden > 1 ? 's' : ''}` : '')
   const cols = [['code', 'Code'], ['des', 'Désignation'], ['empl', 'Emplacement'], ['famille', 'Famille'], ['sousfamille', 'Sous-famille']]
   const th = (key, label, isChar) => {
@@ -897,6 +1155,25 @@ function brancherEvenements() {
   $('stgReversible').onchange = () => { SETTINGS.reversible = $('stgReversible').checked; rsel = { A: {}, B: {} }; saveSettings(); render() }
   $('stgHideDeleted').onchange = () => { SETTINGS.masquerSupprimes = $('stgHideDeleted').checked; saveSettings(); render() }
   $('stgPropositions').onchange = () => { SETTINGS.propositions = $('stgPropositions').checked; appliquerPropositions(); sel = {}; csel = {}; saveSettings(); render() }
+  $('stgComplementsOk').onclick = async () => {
+    try {
+      await api('/api/complements/requete', { methode: 'POST', corps: { sql: $('stgComplements').value } })
+      notifier('Requête des compléments enregistrée')
+      $('settings').close()
+      chargerDepuisLaBase(true)
+    } catch (erreur) {
+      notifier(erreur.message, 'erreur')
+    }
+  }
+  $('configBtn').onclick = () => basculerConfiguration(true)
+  $('finConfig').onclick = () => basculerConfiguration(false)
+  $('dispositionDefaut').onclick = () => {
+    SETTINGS.disposition = { principaux: [], caracteristiques: { ...(SETTINGS.disposition?.caracteristiques || {}) } }
+    if (sel.modele) delete SETTINGS.disposition.caracteristiques[sel.modele]
+    saveSettings(); render()
+    notifier('Disposition par défaut rétablie')
+  }
+  document.addEventListener('click', (e) => { if (!e.target.closest('.dd-zone')) document.querySelectorAll('.dd-liste').forEach((l) => (l.hidden = true)) })
   $('stgArboOk').onclick = async () => {
     try {
       await api('/api/arborescence/requetes', { methode: 'POST', corps: { arbre: $('stgArbre').value, liens: $('stgLiens').value } })
