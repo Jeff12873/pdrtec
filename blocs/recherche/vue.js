@@ -531,13 +531,15 @@ function menusArbo() {
   const racines = [...ARBO.noeuds.values()].filter((n) => !ARBO.noeuds.has(n.parent))
   const niveaux = [racines]
   for (const id of asel) { const n = ARBO.noeuds.get(id); if (n?.enfants.length) niveaux.push(n.enfants) }
-  return niveaux.map((liste, i) => {
+  // Les niveaux s'empilent dans une seule colonne, chacun un peu décalé sous le précédent (comme l'arbre de la GMAO).
+  const menus = niveaux.map((liste, i) => {
     const courant = asel[i] || ''
     // Le nœud choisi reste affiché même si la recherche ne trouve plus de pièce dessous.
     const choix = liste.filter((n) => compte.get(n.id) || n.id === courant).sort(parOrdre)
     if (!choix.length) return ''
-    return `<div class="f"><label for="a_${i}">${i ? '› Dans ' + esc(ARBO.noeuds.get(asel[i - 1])?.code || '') : 'Ligne / arborescence'}</label><select id="a_${i}" data-a="${i}" class="${courant ? 'on' : ''}"><option value="">Tous</option>${choix.map((n) => `<option value="${esc(n.id)}"${n.id === courant ? ' selected' : ''}>${esc(libelleNoeud(n))} (${compte.get(n.id) || 0})</option>`).join('')}</select></div>`
+    return `<div class="f" style="--niveau:${i}"><label for="a_${i}">${i ? '└ Dans ' + esc(ARBO.noeuds.get(asel[i - 1])?.code || '') : 'Ligne / arborescence'}</label><select id="a_${i}" data-a="${i}" class="${courant ? 'on' : ''}"><option value="">Tous</option>${choix.map((n) => `<option value="${esc(n.id)}"${n.id === courant ? ' selected' : ''}>${esc(libelleNoeud(n))} (${compte.get(n.id) || 0})</option>`).join('')}</select></div>`
   }).join('')
+  return menus ? `<div class="arbo-cascade">${menus}</div>` : ''
 }
 
 function match(p, skipMain, skipChar) {

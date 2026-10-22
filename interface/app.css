@@ -24,7 +24,7 @@
 .pdrtec .search { position: relative; }
 .pdrtec .search input { width: 100%; box-sizing: border-box; font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 999px; padding: 12px 18px 12px 44px; }
 .pdrtec .search svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted); }
-.pdrtec .filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.pdrtec .filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; align-items: start; }
 .pdrtec .f { display: grid; gap: 4px; min-width: 0; }
 .pdrtec .f label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-left: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pdrtec .f select { appearance: none; -webkit-appearance: none; font: inherit; font-size: .92rem; width: 100%; color: var(--fg);
@@ -144,3 +144,8 @@
 .pdrtec mark.trouve { background: rgba(250, 204, 21, .28); color: inherit; border-radius: 3px; padding: 0 1px; box-shadow: 0 0 0 1px rgba(250, 204, 21, .45); }
 .pdrtec .chemin-arbo { font-size: .9rem; color: var(--muted); }
 .pdrtec .chemin-arbo b { color: var(--fg); font-weight: 600; }
+
+/* Arborescence des machines : les menus en cascade, empilés dans une colonne, chaque niveau décalé */
+.pdrtec .arbo-cascade { display: grid; gap: 8px; align-content: start; grid-column: span 2; min-width: 0; }
+.pdrtec .arbo-cascade .f { margin-left: calc(var(--niveau, 0) * 22px); }
+@media (max-width: 760px) { .pdrtec .arbo-cascade { grid-column: auto; } .pdrtec .arbo-cascade .f { margin-left: calc(var(--niveau, 0) * 10px); } }
