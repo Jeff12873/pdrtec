@@ -190,3 +190,4 @@
 .pdrtec-dialog .ligne-coche, .pdrtec-dialog .ligne-regle { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .pdrtec-dialog .ligne-coche input { flex: 1; min-width: 160px; }
 .pdrtec-dialog .ligne-regle input { flex: 1; min-width: 140px; }
+.pdrtec td.extra, .pdrtec th.extra { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }

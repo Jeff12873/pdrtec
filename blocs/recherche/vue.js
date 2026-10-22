@@ -52,7 +52,6 @@ const PAGE = `
       <button class="btn primary" id="actualiser" type="button">Actualiser depuis la base</button>
       <label class="btn" for="file">Charger un export BIRT</label>
       <input type="file" id="file" accept=".xls,.xlsx,.csv" multiple hidden>
-      <button class="btn" id="configBtn" type="button" title="Ranger les menus, ajouter des images aux choix, décrire les fiches, régler les coches">Configurer l'affichage</button>
       <button class="btn" id="settingsBtn" type="button">Paramètres</button>
     </div>
   </header>
@@ -96,7 +95,7 @@ const PAGE = `
     <li><b>Filtrer sur les caractéristiques</b> : une fois la sous-famille choisie, ses caractéristiques (tension, diamètre…) apparaissent en dessous et deviennent des colonnes du tableau. Pour les modèles activés dans Paramètres, un champ Tension unique remplace les bornes mini/maxi.</li>
     <li><b>Ligne / arborescence</b> : les pièces montées sur une ligne, un sous-ensemble, une machine, menu après menu (arborescence de la GMAO).</li>
     <li><b>Coches à droite</b> (Supprimée, et celles réglées dans « Configurer l'affichage ») : Tous, Oui ou Non, avec le nombre de pièces.</li>
-    <li><b>Configurer l'affichage</b> : glisser les menus pour les ranger, « Disposition par défaut » pour revenir à l'ordre d'origine, ajouter une image à côté d'un choix (▣ dans la liste), écrire une description sous « Caractéristiques », régler les coches.</li>
+    <li><b>Configurer l'affichage</b> (Paramètres › Mode configuration) : glisser les menus pour les ranger, « Disposition par défaut » pour revenir à l'ordre d'origine, ajouter une image à côté d'un choix (▣ dans la liste), écrire une description sous « Caractéristiques », régler les coches.</li>
     <li><b>Trier le tableau</b> : clique sur l'en-tête d'une colonne pour trier (▲/▼), reclique pour inverser le sens.</li>
     <li><b>Voir le détail</b> : clique sur une pièce pour afficher sa photo (si disponible), son emplacement, son observation complète, ses machines, ses pièces jointes et toutes ses caractéristiques. Clique sur une pièce jointe pour l'ouvrir.</li>
     <li><b>Copier un code</b> : clique sur la petite icône à droite du code d'une pièce pour le mettre dans le presse-papier (elle passe à ✓ une fois copié).</li>
@@ -129,6 +128,11 @@ const PAGE = `
     <p class="note">Un flexible bride SAE ↔ écrou DIN est le même qu'un écrou DIN ↔ bride SAE. Activé, les catégories jumelles d'un modèle (ex. « Embout n°1 » et « Embout n°2 ») sont remplacées par « Un côté » / « L'autre côté », et une pièce est trouvée quel que soit le sens dans lequel elle a été saisie dans la GMAO. L'orientation n'est pas inversée : 90° vu d'un bout peut valoir 270° vu de l'autre.</p>
   </div>
   <div class="stgrow">
+    <label for="stgConfiguration">Mode configuration</label>
+    <label class="stgcheck"><input type="checkbox" id="stgConfiguration"> Configurer l'affichage</label>
+    <p class="note">Coché, un bandeau apparaît au-dessus des menus : glisser les menus pour les ranger, ajouter une image à côté d'un choix, décrire une fiche sous « Caractéristiques », régler les coches. Décocher (ou « Terminer ») pour revenir à l'affichage normal ; les réglages sont gardés.</p>
+  </div>
+  <div class="stgrow">
     <label for="stgPropositions">Familles proposées</label>
     <label class="stgcheck"><input type="checkbox" id="stgPropositions"> Proposer une famille et une sous-famille aux pièces qui n'en ont pas</label>
     <p class="note">PDRTec apprend sur les pièces déjà classées (mots de la désignation, modèle de fiche) et propose la famille et la sous-famille les plus probables aux pièces qui n'en ont pas, quand il en est assez sûr. Les propositions sont <b class="propose">en jaune</b>, servent aux filtres et au tableau, et ne sont jamais écrites dans la GMAO : à reporter dans la GMAO si elles sont justes.</p>
@@ -155,7 +159,7 @@ const PAGE = `
   </div>
   <div class="stgrow">
     <label for="stgComplements">Compléments (stock…)</label>
-    <p class="note">Requête facultative : une ligne par pièce, une colonne codePiece et d'autres colonnes (ex. stock). Ces colonnes peuvent être testées par les coches (« Configurer l'affichage » › « Régler les coches »).</p>
+    <p class="note">Requête facultative : une ligne par pièce, une colonne codePiece et d'autres colonnes (ex. stock). Ces colonnes peuvent être testées par les coches (Paramètres › Mode configuration, puis « Régler les coches »).</p>
     <textarea id="stgComplements" class="stginput" spellcheck="false" placeholder="SELECT … AS codePiece, … AS stock …"></textarea>
     <div class="actions" style="justify-content:flex-start">
       <button class="btn small" id="stgComplementsOk" type="button">Enregistrer la requête des compléments</button>
@@ -189,6 +193,8 @@ const PAGE = `
 const NA = '(non renseigné)'
 const $ = (id) => document.getElementById(id)
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+// « 12.000 » (décimal de la base) → « 12 » ; les textes restent tels quels.
+const nombreLisible = (v) => (v !== '' && !isNaN(Number(v)) ? Number(v).toLocaleString('fr-FR', { maximumFractionDigits: 3 }) : String(v))
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 // Comme esc, avec les mots de la recherche surlignés (accents et majuscules ignorés, comme pour trouver la pièce).
 function hl(s) {
@@ -578,6 +584,7 @@ function menusArbo() {
 
 function basculerConfiguration(actif) {
   configuration = actif
+  $('stgConfiguration').checked = actif
   $('bandeauConfig').hidden = !actif
   document.querySelector('.pdrtec').classList.toggle('en-configuration', actif)
   render()
@@ -908,9 +915,10 @@ function render() {
   $('chips').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { const c = chips[b.dataset.i]; if (c.t === 'm') delete sel[c.k]; else if (c.t === 'a') asel = []; else if (c.t === 't') tensionVal = ''; else if (c.t === 'r') delete rsel[c.s][c.n]; else delete csel[c.k]; render() }))
 
   // Tableau, triable en cliquant sur une colonne (pastille ▲▼ = colonne active)
-  if (sortIsChar && !chars.includes(sortKey)) { sortKey = 'des'; sortIsChar = false; sortDir = 1 }
+  if (sortIsChar && !(sortIsChar === 'x' ? COLONNES_COMPLEMENTS : chars).includes(sortKey)) { sortKey = 'des'; sortIsChar = false; sortDir = 1 }
   const res = PIECES.filter((p) => match(p)).sort((a, b) => {
-    const va = sortIsChar ? a.car[sortKey] : a[sortKey], vb = sortIsChar ? b.car[sortKey] : b[sortKey]
+    const val = (p) => (sortIsChar === 'x' ? p.extra?.[sortKey] : sortIsChar ? p.car[sortKey] : p[sortKey])
+    const va = val(a), vb = val(b)
     const ea = va == null || va === '' || va === NA, eb = vb == null || vb === '' || vb === NA
     if (ea && eb) return 0; if (ea) return 1; if (eb) return -1
     return sortDir * String(va).localeCompare(String(vb), 'fr', { numeric: true })
@@ -920,19 +928,22 @@ function render() {
   const cols = [['code', 'Code'], ['des', 'Désignation'], ['empl', 'Emplacement'], ['famille', 'Famille'], ['sousfamille', 'Sous-famille']]
   const th = (key, label, isChar) => {
     const on = sortIsChar === isChar && sortKey === key
-    return `<th class="${isChar ? 'char' : ''}" data-key="${esc(key)}" data-char="${isChar ? 1 : 0}">${esc(label)}${on ? (sortDir === 1 ? ' ▲' : ' ▼') : ''}</th>`
+    return `<th class="${isChar === 'x' ? 'extra' : isChar ? 'char' : ''}" data-key="${esc(key)}" data-char="${isChar === 'x' ? 'x' : isChar ? 1 : 0}">${esc(label)}${on ? (sortDir === 1 ? ' ▲' : ' ▼') : ''}</th>`
   }
-  $('thead').innerHTML = '<tr>' + cols.map(([k, l]) => th(k, l, false)).join('') + chars.map((c) => th(c, c, true)).join('') + '</tr>'
+  // Les colonnes des compléments (ex. le stock) au bout de chaque ligne.
+  const extras = COLONNES_COMPLEMENTS
+  const titreExtra = (c) => c.charAt(0).toUpperCase() + c.slice(1)
+  $('thead').innerHTML = '<tr>' + cols.map(([k, l]) => th(k, l, false)).join('') + chars.map((c) => th(c, c, true)).join('') + extras.map((c) => th(c, titreExtra(c), 'x')).join('') + '</tr>'
   $('thead').querySelectorAll('th[data-key]').forEach((t) => (t.onclick = () => {
-    const key = t.dataset.key, isChar = t.dataset.char === '1'
+    const key = t.dataset.key, isChar = t.dataset.char === 'x' ? 'x' : t.dataset.char === '1'
     if (sortKey === key && sortIsChar === isChar) sortDir *= -1; else { sortKey = key; sortIsChar = isChar; sortDir = 1 }
     render()
   }))
-  const n = cols.length + chars.length, cell = (v) => (v && v !== NA ? esc(v) : '<span class="na">—</span>')
+  const n = cols.length + chars.length + extras.length, cell = (v) => (v && v !== NA ? esc(v) : '<span class="na">—</span>')
   // Famille ou sous-famille proposée par PDRTec (absente de la GMAO) : en jaune, avec la raison au survol.
   const cellClasse = (p, k) => (p.propose?.[k] ? `<span class="propose" title="${esc(explicationProposition(p, k))}">${esc(p[k])}</span>` : cell(p[k]))
   $('tbody').innerHTML = res.length ? res.slice(0, 500).map((p, i) =>
-    `<tr class="row" tabindex="0" data-i="${i}"><td class="code"><span class="caret">›</span>${hl(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button></td><td class="des">${hl(p.des)}</td><td class="empl">${emplHtml(p.empl)}</td><td>${cellClasse(p, 'famille')}</td><td>${cellClasse(p, 'sousfamille')}</td>${chars.map((c) => `<td>${cell(p.car[c])}</td>`).join('')}</tr>`
+    `<tr class="row" tabindex="0" data-i="${i}"><td class="code"><span class="caret">›</span>${hl(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button></td><td class="des">${hl(p.des)}</td><td class="empl">${emplHtml(p.empl)}</td><td>${cellClasse(p, 'famille')}</td><td>${cellClasse(p, 'sousfamille')}</td>${chars.map((c) => `<td>${cell(p.car[c])}</td>`).join('')}${extras.map((c) => `<td class="extra">${p.extra?.[c] == null || p.extra[c] === '' ? '<span class="na">—</span>' : esc(nombreLisible(p.extra[c]))}</td>`).join('')}</tr>`
     + `<tr class="detail" hidden><td colspan="${n}">${detail(p)}</td></tr>`).join('')
     : PIECES.length ? `<tr><td class="empty" colspan="${n}">Aucune pièce ne correspond. Retire un filtre pour élargir.</td></tr>`
       : `<tr><td class="empty" colspan="${n}">Aucune donnée chargée. « Actualiser depuis la base », ou glisse un export Excel du rapport ici.</td></tr>`
@@ -1165,7 +1176,7 @@ function brancherEvenements() {
       notifier(erreur.message, 'erreur')
     }
   }
-  $('configBtn').onclick = () => basculerConfiguration(true)
+  $('stgConfiguration').onchange = () => { basculerConfiguration($('stgConfiguration').checked); if (configuration) $('settings').close() }
   $('finConfig').onclick = () => basculerConfiguration(false)
   $('dispositionDefaut').onclick = () => {
     SETTINGS.disposition = { principaux: [], caracteristiques: { ...(SETTINGS.disposition?.caracteristiques || {}) } }
