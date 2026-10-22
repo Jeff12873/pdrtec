@@ -80,8 +80,15 @@ const PAGE = `
     </div>
   </section>
 
-  <div class="defil-haut" id="defilHaut" hidden><div></div></div>
-  <div class="tablebox" id="tablebox"><table id="table"><colgroup id="colonnes"></colgroup><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  <div class="zone-table" id="zoneTable">
+    <div class="barre-table">
+      <button class="btn small" id="agrandir" type="button" title="Le tableau occupe tout l'écran (Échap pour revenir)">⤢ Agrandir le tableau</button>
+      <button class="btn small" id="exporterExcel" type="button" title="La liste affichée (tous les filtres appliqués), avec ses colonnes, dans un fichier Excel">⭳ Télécharger la liste (Excel)</button>
+      <button class="btn small" id="exporterCsv" type="button" title="La même liste en CSV (séparateur « ; », s'ouvre dans Excel)">⭳ CSV</button>
+    </div>
+    <div class="defil-haut" id="defilHaut" hidden><div></div></div>
+    <div class="tablebox" id="tablebox"><table id="table"><colgroup id="colonnes"></colgroup><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  </div>
   <p class="note">Clique sur une pièce pour voir son observation et toutes ses caractéristiques. Les données viennent directement de la base de la GMAO (« Actualiser depuis la base ») ; sans connexion, glisse un export Excel du rapport sur la page : il est lu dans ton navigateur et n'est envoyé nulle part.</p>
 </div>
 
@@ -256,6 +263,8 @@ let COMPLEMENTS = new Map(), COLONNES_COMPLEMENTS = []
 let cochesEtat = {}
 // Mode configuration : déplacer les menus, décrire une fiche, ajouter des images aux choix, régler les coches.
 let configuration = false
+// La liste affichée (après tous les filtres) et ses colonnes, pour le téléchargement Excel.
+let derniereListe = { res: [], chars: [], extras: [] }
 let requeteReglee = false
 // Arborescence des machines : nœuds (Map id → { id, parent, code, desi, ordre, enfants }), liens pièce → machines,
 // et la suite des nœuds choisis dans les menus en cascade (du haut vers le bas).
@@ -579,6 +588,50 @@ function menusArbo() {
     return `<div class="f" style="--niveau:${i}" data-fixe="1"><label for="a_${i}">${i ? '└ Dans ' + esc(ARBO.noeuds.get(asel[i - 1])?.code || '') : 'Ligne / arborescence'}</label><select id="a_${i}" data-a="${i}" class="${courant ? 'on' : ''}"><option value="">Tous</option>${choix.map((n) => `<option value="${esc(n.id)}"${n.id === courant ? ' selected' : ''}>${esc(libelleNoeud(n))} (${compte.get(n.id) || 0})</option>`).join('')}</select></div>`
   }).join('')
   return menus ? `<div class="arbo-cascade" data-bloc="arbo">${menus}</div>` : ''
+}
+
+// ---------------------------------------------------------------- tableau agrandi, téléchargement Excel
+
+function agrandirTable(oui) {
+  document.querySelector('.pdrtec').classList.toggle('table-agrandie', oui)
+  $('agrandir').textContent = oui ? '⤡ Réduire le tableau' : '⤢ Agrandir le tableau'
+  majDefilHaut()
+}
+
+// La liste affichée, telle quelle : mêmes colonnes (caractéristiques et compléments compris), toutes les lignes.
+// format : xlsx (Excel) ou csv (séparateur « ; » et accents en UTF-8, comme Excel l'attend en français).
+async function exporterListe(format) {
+  const { res, chars, extras } = derniereListe
+  if (!res.length) return notifier('La liste est vide : rien à télécharger.', 'erreur')
+  let XLSX
+  try {
+    XLSX = await chargerSheetJS()
+  } catch (erreur) {
+    return notifier(erreur.message, 'erreur')
+  }
+  const vide = (v) => (v == null || v === NA ? '' : v)
+  const nombre = (v) => (v !== '' && v != null && !isNaN(Number(v)) ? Number(v) : vide(v))
+  const titres = ['Code', 'Désignation', 'Emplacement', 'Famille', 'Sous-famille', ...chars, ...extras.map((c) => c.charAt(0).toUpperCase() + c.slice(1))]
+  const lignes = res.map((p) => [p.code, p.des, p.empl, vide(p.famille), vide(p.sousfamille), ...chars.map((c) => vide(p.car[c])), ...extras.map((c) => nombre(p.extra?.[c]))])
+  const feuille = XLSX.utils.aoa_to_sheet([titres, ...lignes])
+  feuille['!cols'] = titres.map((t, i) => ({ wch: Math.min(60, Math.max(String(t).length, ...lignes.slice(0, 300).map((l) => String(l[i] ?? '').length)) + 2) }))
+  feuille['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: lignes.length, c: titres.length - 1 } }) }
+  const d = new Date()
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const nom = `PDRTec ${date}${sel.sousfamille ? ' ' + sel.sousfamille.replace(/[\\/:*?"<>|]/g, '-') : ''}`
+  if (format === 'csv') {
+    const texte = '\ufeff' + XLSX.utils.sheet_to_csv(feuille, { FS: ';', RS: '\r\n' })
+    const lien = document.createElement('a')
+    lien.href = URL.createObjectURL(new Blob([texte], { type: 'text/csv;charset=utf-8' }))
+    lien.download = `${nom}.csv`
+    document.body.append(lien); lien.click(); lien.remove()
+    setTimeout(() => URL.revokeObjectURL(lien.href), 10_000)
+  } else {
+    const classeur = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(classeur, feuille, 'Pièces')
+    XLSX.writeFile(classeur, `${nom}.xlsx`)
+  }
+  notifier(`${res.length} pièce${res.length > 1 ? 's' : ''} téléchargée${res.length > 1 ? 's' : ''}`)
 }
 
 // ---------------------------------------------------------------- largeur des colonnes, défilement du haut
@@ -979,6 +1032,7 @@ function render() {
     return sortDir * String(va).localeCompare(String(vb), 'fr', { numeric: true })
   })
   const nHidden = 0
+  derniereListe = { res, chars, extras: COLONNES_COMPLEMENTS }
   $('count').innerHTML = `<b>${res.length}</b> / ${PIECES.length - nHidden} pièces` + (nHidden ? ` · ${nHidden} supprimée${nHidden > 1 ? 's' : ''} masquée${nHidden > 1 ? 's' : ''}` : '')
   const cols = [['code', 'Code'], ['des', 'Désignation'], ['empl', 'Emplacement'], ['famille', 'Famille'], ['sousfamille', 'Sous-famille']]
   const th = (key, label, isChar) => {
@@ -1225,6 +1279,10 @@ function brancherEvenements() {
   $('stgHideDeleted').onchange = () => { SETTINGS.masquerSupprimes = $('stgHideDeleted').checked; saveSettings(); render() }
   $('stgPropositions').onchange = () => { SETTINGS.propositions = $('stgPropositions').checked; appliquerPropositions(); sel = {}; csel = {}; saveSettings(); render() }
   brancherDefilHaut()
+  $('agrandir').onclick = () => agrandirTable(!document.querySelector('.pdrtec').classList.contains('table-agrandie'))
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.pdrtec.table-agrandie')) agrandirTable(false) })
+  $('exporterExcel').onclick = () => exporterListe('xlsx')
+  $('exporterCsv').onclick = () => exporterListe('csv')
   $('stgComplementsOk').onclick = async () => {
     try {
       await api('/api/complements/requete', { methode: 'POST', corps: { sql: $('stgComplements').value } })

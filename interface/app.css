@@ -201,3 +201,10 @@
 .pdrtec th:hover .poignee-col::after, .pdrtec .poignee-col:hover::after { background: var(--accent); }
 .pdrtec table.largeurs-fixes { table-layout: fixed; }
 .pdrtec table.largeurs-fixes th, .pdrtec table.largeurs-fixes tr.row td { overflow: hidden; text-overflow: ellipsis; }
+
+/* Tableau : boutons, agrandi en plein écran */
+.pdrtec .zone-table { display: grid; gap: 8px; min-width: 0; }
+.pdrtec .barre-table { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.pdrtec.table-agrandie .zone-table { position: fixed; inset: 10px; z-index: 60; background: var(--bg); border: 1px solid var(--line); border-radius: 18px; padding: 12px; grid-template-rows: auto auto 1fr; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.pdrtec.table-agrandie .tablebox { overflow: auto; min-height: 0; }
+.pdrtec.table-agrandie thead th { position: sticky; top: 0; z-index: 2; }
