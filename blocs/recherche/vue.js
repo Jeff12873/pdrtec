@@ -57,11 +57,6 @@ const PAGE = `
   </header>
 
   <section class="panel">
-    <div class="bandeau-config" id="bandeauConfig" hidden>
-      <span><b>Mode configuration</b> : glisse les menus pour les ranger (sur la grille), ajoute une image à côté d'un choix (bouton ▣ dans la liste), décris la fiche sous « Caractéristiques », règle les coches.</span>
-      <button class="btn small" id="dispositionDefaut" type="button">Disposition par défaut</button>
-      <button class="btn small primary" id="finConfig" type="button">Terminer</button>
-    </div>
     <div class="search">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="q" type="search" placeholder="Code, désignation, référence fabricant, observation…" autocomplete="off">
@@ -103,7 +98,7 @@ const PAGE = `
     <li><b>Filtrer sur les caractéristiques</b> : une fois la sous-famille choisie, ses caractéristiques (tension, diamètre…) apparaissent en dessous et deviennent des colonnes du tableau. Pour les modèles activés dans Paramètres, un champ Tension unique remplace les bornes mini/maxi.</li>
     <li><b>Ligne / arborescence</b> : les pièces montées sur une ligne, un sous-ensemble, une machine, menu après menu (arborescence de la GMAO).</li>
     <li><b>Coches à droite</b> (Supprimée, et celles réglées dans « Configurer l'affichage ») : Tous, Oui ou Non, avec le nombre de pièces.</li>
-    <li><b>Configurer l'affichage</b> (Paramètres › Mode configuration) : glisser les menus pour les ranger, « Disposition par défaut » pour revenir à l'ordre d'origine, ajouter une image à côté d'un choix (▣ dans la liste), écrire une description sous « Caractéristiques », régler les coches.</li>
+    <li><b>Configurer l'affichage</b> (Paramètres › Mode configuration, décocher pour terminer) : glisser les menus pour les ranger, « Disposition par défaut » (dans les Paramètres) pour revenir à l'ordre d'origine, ajouter une image à côté d'un choix (▣ dans la liste), écrire une description sous « Caractéristiques », régler les coches.</li>
     <li><b>Trier le tableau</b> : clique sur l'en-tête d'une colonne pour trier (▲/▼), reclique pour inverser le sens.</li>
     <li><b>Voir le détail</b> : clique sur une pièce pour afficher sa photo (si disponible), son emplacement, son observation complète, ses machines, ses pièces jointes et toutes ses caractéristiques. Clique sur une pièce jointe pour l'ouvrir.</li>
     <li><b>Copier un code</b> : clique sur la petite icône à droite du code d'une pièce pour le mettre dans le presse-papier (elle passe à ✓ une fois copié).</li>
@@ -138,7 +133,10 @@ const PAGE = `
   <div class="stgrow">
     <label for="stgConfiguration">Mode configuration</label>
     <label class="stgcheck"><input type="checkbox" id="stgConfiguration"> Configurer l'affichage</label>
-    <p class="note">Coché, un bandeau apparaît au-dessus des menus : glisser les menus pour les ranger, ajouter une image à côté d'un choix, décrire une fiche sous « Caractéristiques », régler les coches. Décocher (ou « Terminer ») pour revenir à l'affichage normal ; les réglages sont gardés.</p>
+    <p class="note">Coché : glisser les menus pour les ranger (sur la grille), ajouter une image à côté d'un choix (bouton ▣ dans la liste), décrire une fiche sous « Caractéristiques », régler les coches. Décocher pour terminer : les réglages sont gardés.</p>
+    <div class="actions" style="justify-content:flex-start">
+      <button class="btn small" id="dispositionDefaut" type="button">Disposition par défaut</button>
+    </div>
   </div>
   <div class="stgrow">
     <label for="stgPropositions">Familles proposées</label>
@@ -693,7 +691,6 @@ function brancherDefilHaut() {
 function basculerConfiguration(actif) {
   configuration = actif
   $('stgConfiguration').checked = actif
-  $('bandeauConfig').hidden = !actif
   document.querySelector('.pdrtec').classList.toggle('en-configuration', actif)
   render()
 }
@@ -1294,7 +1291,6 @@ function brancherEvenements() {
     }
   }
   $('stgConfiguration').onchange = () => { basculerConfiguration($('stgConfiguration').checked); if (configuration) $('settings').close() }
-  $('finConfig').onclick = () => basculerConfiguration(false)
   $('dispositionDefaut').onclick = () => {
     SETTINGS.disposition = { principaux: [], caracteristiques: { ...(SETTINGS.disposition?.caracteristiques || {}) } }
     if (sel.modele) delete SETTINGS.disposition.caracteristiques[sel.modele]
