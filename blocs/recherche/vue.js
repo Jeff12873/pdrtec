@@ -1187,7 +1187,7 @@ function render() {
   const cellClasse = (p, k) => (p.propose?.[k] ? `<span class="propose" title="${esc(explicationProposition(p, k))}">${esc(p[k])}</span>` : cell(p[k]))
   const toutes = [
     { cle: 'code', titre: 'Code', tri: ['code', false], classe: 'code', html: (p) => `<span class="caret">›</span>${hl(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button>`, brut: (p) => p.code },
-    { cle: 'des', titre: 'Désignation', tri: ['des', false], classe: 'des', html: (p) => hl(p.des), brut: (p) => p.des },
+    { cle: 'des', titre: 'Désignation', tri: ['des', false], classe: 'des', html: (p) => (modeLegumes ? `<span class="legume" title="${esc(p.des)}">${esc(nomLegume(p))}</span>` : hl(p.des)), brut: (p) => p.des },
     { cle: 'empl', titre: 'Emplacement', tri: ['empl', false], classe: 'empl', html: (p) => emplHtml(p.empl), brut: (p) => p.empl },
     { cle: 'famille', titre: 'Famille', tri: ['famille', false], html: (p) => cellClasse(p, 'famille'), brut: (p) => p.famille },
     { cle: 'sousfamille', titre: 'Sous-famille', tri: ['sousfamille', false], html: (p) => cellClasse(p, 'sousfamille'), brut: (p) => p.sousfamille },
@@ -1514,19 +1514,48 @@ const CHEVELU_SVG = `<svg viewBox="0 0 80 80" width="64" height="64" fill="none"
       <path d="M20.5,38 Q21,56 40,60 Q59,56 59.5,38"/>
       <path d="M33,49 Q40,53.5 47,49" stroke-width="1.8"/>
     </svg>`
+// Le concombre masqué : une pluie de concombres sur toute la page, et les pièces rebaptisées en légumes
+// (l'affichage seulement : codes, recherche, filtres et téléchargements gardent les vraies désignations).
+let modeLegumes = false
+const LEGUMES = ['Courgette', 'Poireau', 'Navet', 'Radis', 'Carotte', 'Betterave', 'Panais', 'Céleri', 'Artichaut', 'Aubergine', 'Potiron', 'Brocoli', 'Chou-fleur', 'Épinard', 'Haricot', 'Petit pois', 'Topinambour', 'Rutabaga', 'Salsifis', 'Cornichon', 'Fenouil', 'Asperge', 'Endive', 'Patate douce']
+const QUALITES = ['hydraulique', 'pneumatique', 'blindé', 'turbo', 'inductif', 'à roulements', 'renforcé', 'double effet', 'étanche', 'basse tension', 'magnétique', 'graissé', 'à ressort', 'haute pression', 'anti-vibration', 'masqué']
+function nomLegume(p) {
+  const n = [...String(p.code)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
+  const chiffres = String(p.des).match(/\d+(?:[.,]\d+)?/)
+  return `${LEGUMES[n % LEGUMES.length]} ${QUALITES[(n >>> 5) % QUALITES.length]}${chiffres ? ' ' + chiffres[0] : ''}`
+}
+function pluieDeConcombres() {
+  const image = new URL('../../interface/concombre-petit.webp', import.meta.url).href
+  const ciel = document.createElement('div')
+  ciel.className = 'pluie-concombres'
+  ciel.setAttribute('aria-hidden', 'true')
+  for (let i = 0; i < 45; i++) {
+    const c = document.createElement(i % 3 ? 'span' : 'img')
+    if (c.tagName === 'IMG') c.src = image; else c.textContent = '🥒'
+    c.style.left = `${Math.random() * 100}vw`
+    c.style.animationDelay = `${Math.random() * 2.2}s`
+    c.style.animationDuration = `${2.6 + Math.random() * 2.4}s`
+    c.style.setProperty('--tour', `${Math.round(Math.random() * 720 - 360)}deg`)
+    c.style.setProperty('--taille', `${0.7 + Math.random() * 0.9}`)
+    ciel.append(c)
+  }
+  document.body.append(ciel)
+  setTimeout(() => ciel.remove(), 7500)
+}
+
 function logoEtTitre() {
   const logo = $('logo'), title = $('title')
   if (Math.random() < 0.5) { logo.innerHTML = CHEVELU_SVG; title.textContent = 'Recherche PDR du chevelu' }
   const original = logo.innerHTML, ORIGINAL_TITLE = title.textContent
-  const CUCUMBER = '<span class="cucumber" role="img" aria-label="concombre masqué">🥒</span><span class="mask" role="img" aria-label="masque">😷</span>'
+  const CUCUMBER = `<img class="concombre-masque" src="${new URL('../../interface/concombre-masque.webp', import.meta.url).href}" alt="Le concombre masqué">`
   let clicks = 0, popped = false
   logo.addEventListener('click', () => {
-    if (popped) { popped = false; clicks = 0; logo.style.transform = ''; logo.innerHTML = original; title.textContent = ORIGINAL_TITLE; return }
+    if (popped) { popped = false; clicks = 0; logo.style.transform = ''; logo.innerHTML = original; title.textContent = ORIGINAL_TITLE; modeLegumes = false; render(); return }
     clicks++
     if (clicks >= 10) {
       popped = true
       logo.classList.add('pop')
-      setTimeout(() => { logo.classList.remove('pop'); logo.style.transform = ''; logo.innerHTML = CUCUMBER; title.textContent = 'Recherche PDR du concombre masqué' }, 220)
+      setTimeout(() => { logo.classList.remove('pop'); logo.style.transform = ''; logo.innerHTML = CUCUMBER; title.textContent = 'Recherche PDR du concombre masqué'; modeLegumes = true; render(); pluieDeConcombres() }, 220)
     } else {
       logo.style.transform = `scale(${1 + clicks * 0.08})`
     }

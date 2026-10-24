@@ -1,9 +1,55 @@
 {
   "versions": [
-    { "version": "0.5.0", "date": "2026-10-24", "points": ["Recherche et Options dans deux blocs, Options repliable", "Colonnes du tableau à choisir et à ranger", "Barre de défilement toujours visible en haut du tableau", "Blocs de caractéristiques déplaçables et renommables", "Coches plus simples à régler (groupes ET / OU, état de départ)"] },
-    { "version": "0.4.3", "date": "2026-10-22", "points": ["Tableau en plein écran", "Téléchargement de la liste en Excel et en CSV"] },
-    { "version": "0.4.2", "date": "2026-10-22", "points": ["Largeur des colonnes réglable"] },
-    { "version": "0.4.0", "date": "2026-10-22", "points": ["Coches Oui / Non : supprimées, non gérées, en stock…", "Stock au bout de chaque ligne", "Mode configuration : images à côté des choix, descriptions des fiches"] },
-    { "version": "0.3.0", "date": "2026-10-21", "points": ["Recherche par ligne, sous-ensemble et machine (arborescence)", "Mot cherché surligné"] }
+    {
+      "version": "0.5.1",
+      "date": "2026-10-24",
+      "points": [
+        "PDRTec passe en vert tilleul",
+        "Une surprise attend qui insiste sur le logo…"
+      ]
+    },
+    {
+      "version": "0.5.0",
+      "date": "2026-10-24",
+      "points": [
+        "Recherche et Options dans deux blocs, Options repliable",
+        "Colonnes du tableau à choisir et à ranger",
+        "Barre de défilement toujours visible en haut du tableau",
+        "Blocs de caractéristiques déplaçables et renommables",
+        "Coches plus simples à régler (groupes ET / OU, état de départ)"
+      ]
+    },
+    {
+      "version": "0.4.3",
+      "date": "2026-10-22",
+      "points": [
+        "Tableau en plein écran",
+        "Téléchargement de la liste en Excel et en CSV"
+      ]
+    },
+    {
+      "version": "0.4.2",
+      "date": "2026-10-22",
+      "points": [
+        "Largeur des colonnes réglable"
+      ]
+    },
+    {
+      "version": "0.4.0",
+      "date": "2026-10-22",
+      "points": [
+        "Coches Oui / Non : supprimées, non gérées, en stock…",
+        "Stock au bout de chaque ligne",
+        "Mode configuration : images à côté des choix, descriptions des fiches"
+      ]
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-10-21",
+      "points": [
+        "Recherche par ligne, sous-ensemble et machine (arborescence)",
+        "Mot cherché surligné"
+      ]
+    }
   ]
 }

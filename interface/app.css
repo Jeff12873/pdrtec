@@ -210,8 +210,9 @@
 .pdrtec.table-agrandie thead th { position: sticky; top: 0; z-index: 2; }
 
 /* Deux blocs : la recherche à gauche, les options (coches) à droite */
-.pdrtec .zone-recherche { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 320px); gap: 16px; align-items: start; }
-@media (max-width: 1000px) { .pdrtec .zone-recherche { grid-template-columns: 1fr; } }
+.pdrtec .zone-recherche { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.pdrtec .panel-recherche { flex: 1 1 520px; min-width: 0; }
+.pdrtec .panel-options { flex: 0 0 auto; min-width: 290px; }
 .pdrtec .panel-options { gap: 10px; padding: 14px 16px; }
 .pdrtec .titre-options { display: flex; align-items: center; gap: 8px; width: 100%; font: inherit; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 .pdrtec .titre-options .na { text-transform: none; letter-spacing: 0; font-weight: 500; }
@@ -257,3 +258,11 @@
 .pdrtec .zone-table { grid-template-columns: minmax(0, 1fr); }
 .pdrtec .tablebox { min-width: 0; max-width: 100%; }
 .editeur-coches select.fin { padding-right: 30px; background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; }
+
+/* Le concombre masqué */
+.pdrtec .logo .concombre-masque { height: 120px; width: auto; animation: pdr-logoin .3s ease-out; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent)) drop-shadow(0 0 26px color-mix(in srgb, var(--accent) 30%, transparent)); }
+.pdrtec td .legume { color: #a3e635; }
+.pluie-concombres { position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden; }
+.pluie-concombres > * { position: absolute; top: -90px; font-size: calc(34px * var(--taille, 1)); height: calc(54px * var(--taille, 1)); width: auto; animation-name: pdr-chute; animation-timing-function: cubic-bezier(.45, .05, .55, .95); animation-fill-mode: forwards; }
+@keyframes pdr-chute { to { transform: translateY(calc(100vh + 140px)) rotate(var(--tour, 360deg)); } }
+@media (prefers-reduced-motion: reduce) { .pluie-concombres { display: none; } }
