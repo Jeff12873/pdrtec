@@ -13,3 +13,4 @@
 
 *.ktec
 *.birtec
+!/nouveautes.json
