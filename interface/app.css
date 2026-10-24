@@ -260,7 +260,7 @@
 .editeur-coches select.fin { padding-right: 30px; background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; }
 
 /* Le concombre masqué */
-.pdrtec .logo .concombre-masque { height: 120px; width: auto; animation: pdr-logoin .3s ease-out; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent)) drop-shadow(0 0 26px color-mix(in srgb, var(--accent) 30%, transparent)); }
+.pdrtec .logo .concombre-masque { height: 240px; width: auto; animation: pdr-logoin .3s ease-out; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent)) drop-shadow(0 0 26px color-mix(in srgb, var(--accent) 30%, transparent)); }
 .pdrtec td .legume { color: #a3e635; }
 .pluie-concombres { position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden; }
 .pluie-concombres > * { position: absolute; top: -90px; font-size: calc(34px * var(--taille, 1)); height: calc(54px * var(--taille, 1)); width: auto; animation-name: pdr-chute; animation-timing-function: cubic-bezier(.45, .05, .55, .95); animation-fill-mode: forwards; }
