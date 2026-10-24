@@ -1,6 +1,13 @@
 {
   "versions": [
     {
+      "version": "0.5.3",
+      "date": "2026-10-24",
+      "points": [
+        "Coches : « ne commence pas par », « ne contient pas », « n’est pas »"
+      ]
+    },
+    {
       "version": "0.5.2",
       "date": "2026-10-24",
       "points": [

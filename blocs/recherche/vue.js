@@ -955,11 +955,14 @@ function chargerComplements(c) {
 }
 
 const CHAMPS_PIECE = { code: 'Code', des: 'Désignation', empl: 'Emplacement', obs: 'Observation', obsMachine: 'Observation machine', famille: 'Famille', sousfamille: 'Sous-famille' }
-const TESTS = { commence: 'commence par', contient: 'contient', egal: 'est', superieur: 'supérieur à', inferieur: 'inférieur à', vide: 'est vide', non_vide: 'n’est pas vide' }
+const TESTS = { commence: 'commence par', ne_commence: 'ne commence pas par', contient: 'contient', ne_contient: 'ne contient pas', egal: 'est', different: 'n’est pas', superieur: 'supérieur à', inferieur: 'inférieur à', vide: 'est vide', non_vide: 'n’est pas vide' }
+// Les tests contraires : vrais quand le test d'origine est faux pour toutes les valeurs (et tous les emplacements).
+const CONTRAIRES = { ne_commence: 'commence', ne_contient: 'contient', different: 'egal' }
 
 // Une règle : le champ (de la pièce ou des compléments), un test, des valeurs (l'une suffit).
 // L'emplacement peut en avoir plusieurs (« ; ») : la règle est vraie si l'un d'eux la vérifie.
 function regleVraie(p, r) {
+  if (CONTRAIRES[r.test]) return !regleVraie(p, { ...r, test: CONTRAIRES[r.test] })
   const brut = r.champ in CHAMPS_PIECE ? p[r.champ] : p.extra?.[r.champ]
   const textes = r.champ === 'empl' ? emplParts(brut) : [String(brut ?? '')]
   const valeurs = (r.valeurs || []).map((v) => String(v).trim()).filter(Boolean)
