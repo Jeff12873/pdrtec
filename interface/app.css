@@ -50,7 +50,7 @@
 .pdrtec .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .pdrtec .chip { font: inherit; font-size: .8rem; font-weight: 600; background: var(--accent-soft); color: var(--accent); border: 0; border-radius: 999px; padding: 5px 10px 5px 12px; cursor: pointer; }
 .pdrtec .chip span { opacity: .7; margin-left: 4px; }
-.pdrtec .tablebox { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow-x: auto; }
+.pdrtec .tablebox { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow-x: clip; }
 .pdrtec table { border-collapse: collapse; width: 100%; font-size: .9rem; }
 .pdrtec th, .pdrtec td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
 .pdrtec th { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; background: var(--surface); }
@@ -146,7 +146,7 @@
 .pdrtec .chemin-arbo b { color: var(--fg); font-weight: 600; }
 
 /* Arborescence des machines : les menus en cascade, empilés dans une colonne, chaque niveau décalé */
-.pdrtec .arbo-cascade { display: grid; gap: 8px; align-content: start; grid-column: span 2; min-width: 0; }
+.pdrtec .arbo-cascade { display: grid; gap: 8px; align-content: start; min-width: 0; }
 .pdrtec .arbo-cascade .f { margin-left: calc(var(--niveau, 0) * 22px); }
 @media (max-width: 760px) { .pdrtec .arbo-cascade { grid-column: auto; } .pdrtec .arbo-cascade .f { margin-left: calc(var(--niveau, 0) * 10px); } }
 
@@ -154,7 +154,7 @@
 .pdrtec .ligne-filtres { display: flex; gap: 18px; align-items: flex-start; }
 .pdrtec .ligne-filtres > .filters { flex: 1; min-width: 0; }
 @media (max-width: 900px) { .pdrtec .ligne-filtres { flex-direction: column; } }
-.pdrtec .coches-panel { display: grid; gap: 6px; align-content: start; padding-left: 18px; border-left: 1px solid var(--line); }
+.pdrtec .coches-panel { display: grid; gap: 6px; align-content: start; }
 .pdrtec .coche { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .pdrtec .nom-coche { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pdrtec .segs { display: inline-flex; background: var(--chip); border-radius: 999px; padding: 2px; flex: none; }
@@ -193,7 +193,7 @@
 .pdrtec td.extra, .pdrtec th.extra { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Barre de défilement au-dessus du tableau, et largeur des colonnes réglable */
-.pdrtec .defil-haut { overflow-x: auto; overflow-y: hidden; height: 14px; margin-bottom: -12px; }
+.pdrtec .defil-haut { overflow-x: auto; overflow-y: hidden; height: 16px; position: sticky; top: var(--haut-barre, 0px); z-index: 6; background: var(--bg); border-radius: 8px; }
 .pdrtec .defil-haut > div { height: 1px; }
 .pdrtec th { position: relative; }
 .pdrtec .poignee-col { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; }
@@ -206,5 +206,54 @@
 .pdrtec .zone-table { display: grid; gap: 8px; min-width: 0; }
 .pdrtec .barre-table { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .pdrtec.table-agrandie .zone-table { position: fixed; inset: 10px; z-index: 60; background: var(--bg); border: 1px solid var(--line); border-radius: 18px; padding: 12px; grid-template-rows: auto auto 1fr; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
-.pdrtec.table-agrandie .tablebox { overflow: auto; min-height: 0; }
+.pdrtec.table-agrandie .tablebox { overflow-x: hidden; overflow-y: auto; min-height: 0; }
 .pdrtec.table-agrandie thead th { position: sticky; top: 0; z-index: 2; }
+
+/* Deux blocs : la recherche à gauche, les options (coches) à droite */
+.pdrtec .zone-recherche { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 320px); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .pdrtec .zone-recherche { grid-template-columns: 1fr; } }
+.pdrtec .panel-options { gap: 10px; padding: 14px 16px; }
+.pdrtec .titre-options { display: flex; align-items: center; gap: 8px; width: 100%; font: inherit; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.pdrtec .titre-options .na { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.pdrtec .fleche-options { margin-left: auto; color: var(--muted); transition: transform .15s; }
+.pdrtec .panel-options.repliees .fleche-options { transform: rotate(-90deg); }
+.pdrtec .panel-options.repliees #coches { display: none; }
+
+/* Titres de colonne collés en haut en descendant, et déplaçables */
+.pdrtec thead th { position: sticky; top: calc(var(--haut-barre, 0px) + 16px); z-index: 2; }
+.pdrtec.table-agrandie thead th { top: 0; }
+.pdrtec.table-agrandie .defil-haut { position: static; }
+.pdrtec.table-agrandie .tablebox { overflow-y: auto; }
+.pdrtec th[draggable=true] { cursor: grab; }
+.pdrtec th.cible { box-shadow: inset 3px 0 0 var(--accent); }
+.pdrtec th.tire { opacity: .45; }
+.pdrtec-dialog .liste-colonnes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 14px; margin: 8px 0 12px; }
+
+/* Blocs de caractéristiques en mode configuration : poignée et nom modifiable */
+.pdrtec .titre-bloc { display: flex; align-items: center; gap: 6px; }
+.pdrtec .poignee-bloc { cursor: grab; color: var(--muted); padding: 0 4px; user-select: none; }
+.pdrtec .nom-bloc { font: inherit; font-size: .78rem; font-weight: 600; color: var(--accent); background: var(--chip); border: 1px dashed var(--line); border-radius: 8px; padding: 2px 8px; min-width: 200px; }
+.pdrtec .fgroup.tire { opacity: .4; }
+
+/* Nombre de pièces d'un choix, en discret */
+.pdrtec .dd-choix .nb { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+
+/* Éditeur des coches : une règle par ligne, des retraits par groupe, des champs plus fins */
+.pdrtec-dialog.editeur-coches { max-width: min(900px, calc(100vw - 32px)); width: 900px; }
+.editeur-coches .fin { font: inherit; font-size: .85rem; padding: 4px 8px; min-height: 0; height: 32px; border-radius: 8px; width: auto; }
+.editeur-coches input.fin { flex: 1; min-width: 140px; }
+.editeur-coches .nom-coche-edit { font-weight: 600; max-width: 260px; }
+.editeur-coches .btn.mini { font-size: .78rem; padding: 3px 10px; }
+.editeur-coches .ligne-coche, .editeur-coches .ligne-regle { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.editeur-coches .espace { flex: 1; }
+.editeur-coches .depart { display: flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--texte-3); }
+.editeur-coches .nom-fixe { font-size: .9rem; }
+.editeur-coches .regles { display: grid; gap: 4px; margin-left: 18px; padding-left: 12px; border-left: 2px solid var(--bord); }
+.editeur-coches .groupe-regles { display: grid; gap: 4px; }
+.editeur-coches .groupe-regles > .regles { border-left-color: var(--accent); }
+.editeur-coches .ajout-regles { display: flex; gap: 6px; }
+/* Le tableau ne doit jamais élargir la page : c'est la barre du haut qui le fait défiler */
+.pdrtec > *, .pdrtec .zone-table > * { min-width: 0; }
+.pdrtec .zone-table { grid-template-columns: minmax(0, 1fr); }
+.pdrtec .tablebox { min-width: 0; max-width: 100%; }
+.editeur-coches select.fin { padding-right: 30px; background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; }

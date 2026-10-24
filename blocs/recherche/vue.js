@@ -56,15 +56,13 @@ const PAGE = `
     </div>
   </header>
 
-  <section class="panel">
+  <div class="zone-recherche">
+  <section class="panel panel-recherche">
     <div class="search">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="q" type="search" placeholder="Code, désignation, référence fabricant, observation…" autocomplete="off">
     </div>
-    <div class="ligne-filtres">
-      <div class="filters" id="filters"></div>
-      <div id="coches"></div>
-    </div>
+    <div class="filters" id="filters"></div>
     <div class="group" id="chargroup">
       <h2 id="chartitle"></h2>
       <div class="filters" id="charfilters"></div>
@@ -74,9 +72,15 @@ const PAGE = `
       <div class="count" id="count"></div>
     </div>
   </section>
+  <aside class="panel panel-options" id="panelOptions">
+    <button class="titre-options" id="titreOptions" type="button" aria-expanded="true"><span>Options</span><span class="na" id="optionsActives"></span><span class="fleche-options">▾</span></button>
+    <div id="coches"></div>
+  </aside>
+  </div>
 
   <div class="zone-table" id="zoneTable">
     <div class="barre-table">
+      <button class="btn small" id="choixColonnes" type="button" title="Afficher ou masquer des colonnes ; glisser un titre de colonne pour changer l'ordre">☰ Colonnes</button>
       <button class="btn small" id="agrandir" type="button" title="Le tableau occupe tout l'écran (Échap pour revenir)">⤢ Agrandir le tableau</button>
       <button class="btn small" id="exporterExcel" type="button" title="La liste affichée (tous les filtres appliqués), avec ses colonnes, dans un fichier Excel">⭳ Télécharger la liste (Excel)</button>
       <button class="btn small" id="exporterCsv" type="button" title="La même liste en CSV (séparateur « ; », s'ouvre dans Excel)">⭳ CSV</button>
@@ -97,8 +101,9 @@ const PAGE = `
     <li><b>Filtrer en cascade</b> : choisis une famille puis une sous-famille. Chaque liste ne propose que les valeurs encore possibles. Le modèle de fiche technique se détermine automatiquement à partir de la sous-famille, il n'y a rien à choisir.</li>
     <li><b>Filtrer sur les caractéristiques</b> : une fois la sous-famille choisie, ses caractéristiques (tension, diamètre…) apparaissent en dessous et deviennent des colonnes du tableau. Pour les modèles activés dans Paramètres, un champ Tension unique remplace les bornes mini/maxi.</li>
     <li><b>Ligne / arborescence</b> : les pièces montées sur une ligne, un sous-ensemble, une machine, menu après menu (arborescence de la GMAO).</li>
-    <li><b>Coches à droite</b> (Supprimée, et celles réglées dans « Configurer l'affichage ») : Tous, Oui ou Non, avec le nombre de pièces.</li>
-    <li><b>Configurer l'affichage</b> (Paramètres › Mode configuration, décocher pour terminer) : glisser les menus pour les ranger, « Disposition par défaut » (dans les Paramètres) pour revenir à l'ordre d'origine, ajouter une image à côté d'un choix (▣ dans la liste), écrire une description sous « Caractéristiques », régler les coches.</li>
+    <li><b>Options</b> (bloc de droite) : les coches Supprimée, et celles réglées par toi, sur Tous / Oui / Non avec le nombre de pièces. Clique sur « Options » pour replier le bloc ; les coches actives restent en pastilles.</li>
+    <li><b>Colonnes</b> (au-dessus du tableau) : afficher ou masquer des colonnes ; glisser un titre de colonne sur un autre pour changer l'ordre ; glisser le bord d'un titre pour la largeur. Ces choix sont gardés sur ce poste, et le téléchargement Excel / CSV les suit.</li>
+    <li><b>Mode configuration</b> (Paramètres) : glisser les menus, glisser les blocs de caractéristiques par leur poignée ⠿ et les renommer, ajouter une image à côté d'un choix (▣ dans la liste), décrire une fiche, régler les coches (règles, groupes ET / OU, état de départ). « Disposition par défaut » revient à l'ordre d'origine. Décocher pour terminer.</li>
     <li><b>Trier le tableau</b> : clique sur l'en-tête d'une colonne pour trier (▲/▼), reclique pour inverser le sens.</li>
     <li><b>Voir le détail</b> : clique sur une pièce pour afficher sa photo (si disponible), son emplacement, son observation complète, ses machines, ses pièces jointes et toutes ses caractéristiques. Clique sur une pièce jointe pour l'ouvrir.</li>
     <li><b>Copier un code</b> : clique sur la petite icône à droite du code d'une pièce pour le mettre dans le presse-papier (elle passe à ✓ une fois copié).</li>
@@ -142,11 +147,6 @@ const PAGE = `
     <label for="stgPropositions">Familles proposées</label>
     <label class="stgcheck"><input type="checkbox" id="stgPropositions"> Proposer une famille et une sous-famille aux pièces qui n'en ont pas</label>
     <p class="note">PDRTec apprend sur les pièces déjà classées (mots de la désignation, modèle de fiche) et propose la famille et la sous-famille les plus probables aux pièces qui n'en ont pas, quand il en est assez sûr. Les propositions sont <b class="propose">en jaune</b>, servent aux filtres et au tableau, et ne sont jamais écrites dans la GMAO : à reporter dans la GMAO si elles sont justes.</p>
-  </div>
-  <div class="stgrow">
-    <label for="stgHideDeleted">Emplacements supprimés</label>
-    <label class="stgcheck"><input type="checkbox" id="stgHideDeleted"> Masquer les pièces dont l'emplacement est « SUPPRIME »</label>
-    <p class="note">Décoché, ces pièces restent visibles et leur emplacement est signalé par une étiquette rouge. Coché, elles disparaissent du tableau et des listes de filtres ; le compteur indique combien sont masquées. Une pièce rangée à plusieurs endroits n'est masquée que si tous ses emplacements sont supprimés.</p>
   </div>
   <div class="stgrow">
     <label>Modèles avec tension mini/maxi</label>
@@ -262,7 +262,11 @@ let cochesEtat = {}
 // Mode configuration : déplacer les menus, décrire une fiche, ajouter des images aux choix, régler les coches.
 let configuration = false
 // La liste affichée (après tous les filtres) et ses colonnes, pour le téléchargement Excel.
-let derniereListe = { res: [], chars: [], extras: [] }
+let derniereListe = { res: [], colonnes: [], toutes: [] }
+// Colonnes du tableau, propres à ce poste : ordre (clés) et colonnes masquées.
+let choixColonnes = { ordre: [], masquees: [] }
+try { choixColonnes = { ordre: [], masquees: [], ...JSON.parse(localStorage.getItem('pdrtec-colonnes') || '{}') } } catch {}
+const retenirColonnes = () => { try { localStorage.setItem('pdrtec-colonnes', JSON.stringify(choixColonnes)) } catch {} }
 let requeteReglee = false
 // Arborescence des machines : nœuds (Map id → { id, parent, code, desi, ordre, enfants }), liens pièce → machines,
 // et la suite des nœuds choisis dans les menus en cascade (du haut vers le bas).
@@ -279,7 +283,9 @@ async function demarrer() {
   SETTINGS = { ...SETTINGS, ...lus }
   $('stgRequete').value = lus.requete || ''
   $('stgComplements').value = lus.complements || ''
-  cochesEtat.supprimees = SETTINGS.masquerSupprimes ? 'non' : 'tous'
+  // « Supprimée » : état de départ réglé dans l'éditeur des coches (avant : la case « masquer les supprimés »).
+  SETTINGS.supprimees ||= SETTINGS.masquerSupprimes ? 'non' : 'tous'
+  etatsDeDepart()
   $('stgArbre').value = lus.arborescence?.arbre || ''
   $('stgLiens').value = lus.arborescence?.liens || ''
   brancherEvenements()
@@ -327,8 +333,8 @@ let minuterieReglages
 function saveSettings() {
   clearTimeout(minuterieReglages)
   minuterieReglages = setTimeout(() => {
-    const { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions, coches, disposition, descriptions, images } = SETTINGS
-    api('/api/reglages', { methode: 'POST', corps: { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions, coches, disposition, descriptions, images } }).catch(() => {})
+    const { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions, coches, supprimees, disposition, descriptions, images } = SETTINGS
+    api('/api/reglages', { methode: 'POST', corps: { serveur, modeleLien, reversible, masquerSupprimes, modelesTension, propositions, coches, supprimees, disposition, descriptions, images } }).catch(() => {})
   }, 400)
 }
 
@@ -583,7 +589,7 @@ function menusArbo() {
     // Le nœud choisi reste affiché même si la recherche ne trouve plus de pièce dessous.
     const choix = liste.filter((n) => compte.get(n.id) || n.id === courant).sort(parOrdre)
     if (!choix.length) return ''
-    return `<div class="f" style="--niveau:${i}" data-fixe="1"><label for="a_${i}">${i ? '└ Dans ' + esc(ARBO.noeuds.get(asel[i - 1])?.code || '') : 'Ligne / arborescence'}</label><select id="a_${i}" data-a="${i}" class="${courant ? 'on' : ''}"><option value="">Tous</option>${choix.map((n) => `<option value="${esc(n.id)}"${n.id === courant ? ' selected' : ''}>${esc(libelleNoeud(n))} (${compte.get(n.id) || 0})</option>`).join('')}</select></div>`
+    return `<div class="f" style="--niveau:${i}" data-fixe="1"><label for="a_${i}">${i ? '└ Dans ' + esc(ARBO.noeuds.get(asel[i - 1])?.code || '') : 'Ligne / arborescence'}</label><select id="a_${i}" data-a="${i}" class="${courant ? 'on' : ''}"><option value="">Tous</option>${choix.map((n) => `<option value="${esc(n.id)}" data-n="${compte.get(n.id) || 0}"${n.id === courant ? ' selected' : ''}>${esc(libelleNoeud(n))}</option>`).join('')}</select></div>`
   }).join('')
   return menus ? `<div class="arbo-cascade" data-bloc="arbo">${menus}</div>` : ''
 }
@@ -599,7 +605,7 @@ function agrandirTable(oui) {
 // La liste affichée, telle quelle : mêmes colonnes (caractéristiques et compléments compris), toutes les lignes.
 // format : xlsx (Excel) ou csv (séparateur « ; » et accents en UTF-8, comme Excel l'attend en français).
 async function exporterListe(format) {
-  const { res, chars, extras } = derniereListe
+  const { res, colonnes } = derniereListe
   if (!res.length) return notifier('La liste est vide : rien à télécharger.', 'erreur')
   let XLSX
   try {
@@ -609,8 +615,8 @@ async function exporterListe(format) {
   }
   const vide = (v) => (v == null || v === NA ? '' : v)
   const nombre = (v) => (v !== '' && v != null && !isNaN(Number(v)) ? Number(v) : vide(v))
-  const titres = ['Code', 'Désignation', 'Emplacement', 'Famille', 'Sous-famille', ...chars, ...extras.map((c) => c.charAt(0).toUpperCase() + c.slice(1))]
-  const lignes = res.map((p) => [p.code, p.des, p.empl, vide(p.famille), vide(p.sousfamille), ...chars.map((c) => vide(p.car[c])), ...extras.map((c) => nombre(p.extra?.[c]))])
+  const titres = colonnes.map((c) => c.titre)
+  const lignes = res.map((p) => colonnes.map((c) => (c.nombre ? nombre(c.brut(p)) : vide(c.brut(p)))))
   const feuille = XLSX.utils.aoa_to_sheet([titres, ...lignes])
   feuille['!cols'] = titres.map((t, i) => ({ wch: Math.min(60, Math.max(String(t).length, ...lignes.slice(0, 300).map((l) => String(l[i] ?? '').length)) + 2) }))
   feuille['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: lignes.length, c: titres.length - 1 } }) }
@@ -671,19 +677,78 @@ function appliquerLargeurs() {
   majDefilHaut()
 }
 
-// La barre de défilement du haut suit celle du bas (et inversement) ; cachée si le tableau tient dans la largeur.
+// La barre de défilement horizontal reste collée en haut de l'écran (sous la barre de KTEC) pendant qu'on descend
+// dans la liste, avec les titres des colonnes : c'est elle qui fait glisser le tableau (la molette avec Maj aussi).
 function majDefilHaut() {
-  const boite = $('tablebox'), haut = $('defilHaut')
-  haut.firstElementChild.style.width = boite.scrollWidth + 'px'
-  haut.hidden = boite.scrollWidth <= boite.clientWidth + 1
+  const boite = $('tablebox'), haut = $('defilHaut'), table = $('table')
+  const barre = document.querySelector('.barre')
+  document.querySelector('.pdrtec')?.style.setProperty('--haut-barre', `${barre ? barre.offsetHeight : 0}px`)
+  haut.firstElementChild.style.width = table.offsetWidth + 'px'
+  haut.hidden = table.offsetWidth <= boite.clientWidth + 1
+  if (haut.hidden) haut.scrollLeft = 0
+  table.style.transform = haut.scrollLeft ? `translateX(${-haut.scrollLeft}px)` : ''
 }
 function brancherDefilHaut() {
   const boite = $('tablebox'), haut = $('defilHaut')
-  let suit = false
-  haut.onscroll = () => { if (suit) return; suit = true; boite.scrollLeft = haut.scrollLeft; suit = false }
-  boite.onscroll = () => { if (suit) return; suit = true; haut.scrollLeft = boite.scrollLeft; suit = false }
+  haut.onscroll = () => { $('table').style.transform = haut.scrollLeft ? `translateX(${-haut.scrollLeft}px)` : '' }
+  boite.addEventListener('wheel', (e) => {
+    const dx = e.shiftKey ? e.deltaY : e.deltaX
+    if (!dx || haut.hidden) return
+    e.preventDefault()
+    haut.scrollLeft += dx
+  }, { passive: false })
   new ResizeObserver(majDefilHaut).observe(boite)
   new ResizeObserver(majDefilHaut).observe($('table'))
+}
+
+// Glisser un titre de colonne sur un autre change l'ordre des colonnes (retenu sur ce poste).
+function brancherOrdreColonnes(colonnes) {
+  let tire = null
+  $('thead').querySelectorAll('th[data-col]').forEach((t) => {
+    t.ondragstart = (e) => { tire = t.dataset.col; t.classList.add('tire'); e.dataTransfer.effectAllowed = 'move' }
+    t.ondragend = () => { t.classList.remove('tire'); tire = null; $('thead').querySelectorAll('.cible').forEach((x) => x.classList.remove('cible')) }
+    t.ondragover = (e) => { if (!tire || tire === t.dataset.col) return; e.preventDefault(); t.classList.add('cible') }
+    t.ondragleave = () => t.classList.remove('cible')
+    t.ondrop = (e) => {
+      e.preventDefault()
+      if (!tire || tire === t.dataset.col) return
+      const visibles = colonnes.map((c) => c.cle).filter((c) => c !== tire)
+      const r = t.getBoundingClientRect()
+      visibles.splice(visibles.indexOf(t.dataset.col) + (e.clientX > r.left + r.width / 2 ? 1 : 0), 0, tire)
+      const masquees = derniereListe.toutes.map((c) => c.cle).filter((c) => !visibles.includes(c))
+      choixColonnes.ordre = [...visibles, ...masquees]
+      retenirColonnes()
+      render()
+    }
+  })
+}
+
+// « Colonnes » : afficher ou masquer chaque colonne, ou revenir aux colonnes par défaut.
+function choisirColonnes() {
+  const dlg = document.createElement('dialog')
+  dlg.className = 'pdrtec-dialog'
+  const dessiner = () => {
+    const toutes = ordonner(derniereListe.toutes.map((c) => ({ ...c, id: c.cle })), choixColonnes.ordre)
+    dlg.innerHTML = `<div class="dhead"><h2>Colonnes du tableau</h2><button class="btn small" data-a="fermer" type="button">Fermer</button></div>
+      <p class="note">Coche les colonnes à afficher. Pour changer l'ordre, glisse un titre de colonne sur un autre, directement dans le tableau. Ces choix sont gardés sur ce poste, et le téléchargement Excel / CSV les suit.</p>
+      <div class="liste-colonnes">${toutes.map((c) => `<label class="stgcheck"><input type="checkbox" data-col="${esc(c.cle)}"${choixColonnes.masquees.includes(c.cle) ? '' : ' checked'}> ${esc(c.titre)}${c.classe === 'char' ? ' <span class="na">(caractéristique)</span>' : c.classe === 'extra' ? ' <span class="na">(compléments)</span>' : ''}</label>`).join('')}</div>
+      <div class="actions" style="justify-content:flex-start"><button class="btn small" type="button" data-a="defaut">Colonnes par défaut</button></div>`
+  }
+  dlg.addEventListener('change', (e) => {
+    const cle = e.target.dataset.col
+    if (!cle) return
+    choixColonnes.masquees = e.target.checked ? choixColonnes.masquees.filter((c) => c !== cle) : [...new Set([...choixColonnes.masquees, cle])]
+    retenirColonnes(); render()
+  })
+  dlg.addEventListener('click', (e) => {
+    const a = e.target.closest('button[data-a]')?.dataset.a
+    if (a === 'fermer') dlg.close()
+    if (a === 'defaut') { choixColonnes = { ordre: [], masquees: [] }; retenirColonnes(); render(); dessiner() }
+  })
+  dlg.addEventListener('close', () => dlg.remove())
+  dessiner()
+  document.body.append(dlg)
+  dlg.showModal()
 }
 
 // ---------------------------------------------------------------- mode configuration
@@ -706,6 +771,28 @@ function ordonner(blocs, ordre) {
 // pour les caractéristiques. La grille garde l'alignement.
 function brancherConfiguration() {
   if (!configuration) return
+  // Les blocs de caractéristiques se déplacent par leur poignée ⠿ ; l'ordre est retenu par fiche technique.
+  let blocTire = null
+  $('charfilters').querySelectorAll('.fgroup[data-groupe]').forEach((g) => {
+    const poignee = g.querySelector('.poignee-bloc')
+    if (poignee) {
+      poignee.ondragstart = (e) => { e.stopPropagation(); blocTire = g; g.classList.add('tire'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setDragImage(g, 20, 20) }
+      poignee.ondragend = () => { g.classList.remove('tire'); blocTire = null }
+    }
+    g.addEventListener('dragover', (e) => {
+      if (!blocTire || blocTire === g) return
+      e.preventDefault()
+      const r = g.getBoundingClientRect()
+      g.parentNode.insertBefore(blocTire, e.clientY > r.top + r.height / 2 ? g.nextSibling : g)
+    })
+    g.addEventListener('drop', (e) => {
+      if (!blocTire) return
+      e.preventDefault()
+      const blocs = { ...(SETTINGS.disposition?.blocs || {}), [sel.modele]: [...$('charfilters').querySelectorAll('.fgroup[data-groupe]')].map((x) => x.dataset.groupe) }
+      SETTINGS.disposition = { ...SETTINGS.disposition, blocs }
+      saveSettings()
+    })
+  })
   const zones = [$('filters'), ...$('charfilters').querySelectorAll('.filters'), $('charfilters')]
   let tire = null
   for (const zone of zones) {
@@ -730,21 +817,21 @@ function brancherConfiguration() {
   }
 }
 
-// Les menus deviennent des listes avec images quand des images ont été ajoutées à leurs choix
-// (et toujours en mode configuration, pour pouvoir en ajouter). Le vrai menu reste caché derrière : son état ne change pas.
+// Tous les menus s'affichent avec la même liste, aux couleurs du thème, qui sait montrer une image à côté d'un choix
+// et le nombre de pièces en discret. Le vrai menu reste caché derrière : son état ne change pas.
 function ameliorerMenus() {
-  document.querySelectorAll('.pdrtec select[data-img]').forEach((s) => {
-    const cle = s.dataset.img
-    const avecImages = Object.keys(SETTINGS.images || {}).some((k) => k.startsWith(cle + '\u0001'))
-    if (!avecImages && !configuration) return
-    const imageDe = (v) => { const n = SETTINGS.images?.[cle + '\u0001' + v]; return n ? `<img src="${esc(adresse(`/api/images/${encodeURIComponent(n)}`))}" alt="">` : '' }
+  document.querySelectorAll('.pdrtec select[data-img], .pdrtec select[data-a]').forEach((s) => {
+    const cle = s.dataset.img || ''
+    const imageDe = (v) => { const n = cle && SETTINGS.images?.[cle + '\u0001' + v]; return n ? `<img src="${esc(adresse(`/api/images/${encodeURIComponent(n)}`))}" alt="">` : '' }
+    const compte = (o) => (o.dataset.n ? `<small class="nb">${esc(o.dataset.n)}</small>` : '')
     const zone = document.createElement('div')
     zone.className = 'dd-zone'
     const choisi = s.options[s.selectedIndex]
-    zone.innerHTML = `<button type="button" class="dd ${s.className}">${choisi && choisi.value ? imageDe(choisi.value) : ''}<span>${esc(choisi?.text || 'Tous')}</span></button><div class="dd-liste" hidden>${[...s.options].map((o) => `<div class="dd-choix${o.selected ? ' on' : ''}" data-v="${esc(o.value)}">${o.value ? imageDe(o.value) : ''}<span>${esc(o.text)}</span>${configuration && o.value ? `<button type="button" class="dd-image" title="${SETTINGS.images?.[cle + '\u0001' + o.value] ? 'Retirer l’image' : 'Ajouter une image'}">${SETTINGS.images?.[cle + '\u0001' + o.value] ? '✕' : '▣'}</button>` : ''}</div>`).join('')}</div>`
+    zone.innerHTML = `<button type="button" class="dd ${s.className}">${choisi && choisi.value ? imageDe(choisi.value) : ''}<span>${esc(choisi?.text || 'Tous')}</span></button><div class="dd-liste" hidden>${[...s.options].map((o) => `<div class="dd-choix${o.selected ? ' on' : ''}" data-v="${esc(o.value)}">${o.value ? imageDe(o.value) : ''}<span>${esc(o.text)}</span>${compte(o)}${configuration && cle && o.value ? `<button type="button" class="dd-image" title="${SETTINGS.images?.[cle + '\u0001' + o.value] ? 'Retirer l’image' : 'Ajouter une image'}">${SETTINGS.images?.[cle + '\u0001' + o.value] ? '✕' : '▣'}</button>` : ''}</div>`).join('')}</div>`
     s.hidden = true
     s.after(zone)
     const liste = zone.querySelector('.dd-liste')
+    zone.addEventListener('keydown', (e) => { if (e.key === 'Escape') liste.hidden = true })
     zone.querySelector('.dd').onclick = () => { const ouvert = !liste.hidden; document.querySelectorAll('.dd-liste').forEach((l) => (l.hidden = true)); liste.hidden = ouvert }
     liste.querySelectorAll('.dd-choix').forEach((c) => (c.onclick = (e) => {
       const v = c.dataset.v
@@ -782,40 +869,67 @@ function changerImage(cle, valeur) {
   choix.click()
 }
 
-// L'éditeur des coches : un nom, des règles (champ, test, valeurs séparées par des virgules), liées par OU ou ET.
+// L'éditeur des coches. Pour chaque coche : un nom, son état de départ (Tous, Oui, Non), et ses règles,
+// une par ligne, liées par OU (une suffit) ou ET (toutes) ; un groupe ( … ) a son propre lien, en retrait.
+// Une règle : champ (de la pièce ou des compléments), test, valeurs séparées par des virgules.
 function editerCoches() {
   let coches = structuredClone(SETTINGS.coches || [])
+  let departSupprimees = SETTINGS.supprimees || 'tous'
   const champs = { ...CHAMPS_PIECE, ...Object.fromEntries(COLONNES_COMPLEMENTS.map((c) => [c, `${c} (compléments)`])) }
+  const ETATS = { tous: 'Tous', oui: 'Oui', non: 'Non' }
   const dlg = document.createElement('dialog')
-  dlg.className = 'pdrtec-dialog'
-  const options_ = (o, v) => Object.entries(o).map(([k, t]) => `<option value="${esc(k)}"${k === v ? ' selected' : ''}>${esc(t)}</option>`).join('')
+  dlg.className = 'pdrtec-dialog editeur-coches'
+  const opts = (o, v) => Object.entries(o).map(([k, t]) => `<option value="${esc(k)}"${k === v ? ' selected' : ''}>${esc(t)}</option>`).join('')
+  // Le chemin d'une liste de règles : « i » (la coche), puis les indices des groupes (« i.2.0 »).
+  const liste = (chemin) => {
+    const [i, ...reste] = chemin.split('.').map(Number)
+    let r = coches[i]
+    for (const j of reste) r = r.regles[j]
+    return r
+  }
+  const lien = (chemin, valeur) => `<select class="fin" data-lien="${chemin}"><option value="ou"${valeur !== 'et' ? ' selected' : ''}>une règle suffit (OU)</option><option value="et"${valeur === 'et' ? ' selected' : ''}>toutes les règles (ET)</option></select>`
+  const regles = (chemin, items, profondeur) => `<div class="regles" style="--profondeur:${profondeur}">${items.map((r, j) => {
+    const ici = `${chemin}.${j}`
+    if (r.regles) {
+      return `<div class="groupe-regles"><div class="ligne-regle">${lien(ici, r.lien)}<span class="na">groupe</span><span class="espace"></span><button class="btn mini" type="button" data-a="retirer" data-c="${ici}">✕</button></div>${regles(ici, r.regles, profondeur + 1)}</div>`
+    }
+    return `<div class="ligne-regle"><select class="fin" data-c="${ici}" data-r="champ">${opts(champs, r.champ)}</select><select class="fin" data-c="${ici}" data-r="test">${opts(TESTS, r.test)}</select>${['vide', 'non_vide'].includes(r.test) ? '<span class="espace"></span>' : `<input class="fin" type="text" value="${esc((r.valeurs || []).join(', '))}" data-c="${ici}" data-r="valeurs" placeholder="valeurs, séparées par des virgules">`}<button class="btn mini" type="button" data-a="retirer" data-c="${ici}">✕</button></div>`
+  }).join('')}<div class="ajout-regles"><button class="btn mini" type="button" data-a="regle" data-c="${chemin}">+ Règle</button>${profondeur < 3 ? `<button class="btn mini" type="button" data-a="groupe" data-c="${chemin}">+ Groupe ( … )</button>` : ''}</div></div>`
   const dessiner = () => {
     dlg.innerHTML = `<div class="dhead"><h2>Les coches</h2><button class="btn small" data-a="fermer" type="button">Fermer</button></div>
-      <p class="note">Chaque coche se règle ensuite sur Tous / Oui / Non. Une pièce est « Oui » si l'une des règles est vraie (OU), ou toutes (ET). Plusieurs valeurs : séparées par des virgules.${COLONNES_COMPLEMENTS.length ? '' : ' Pour tester le stock, ajoutez d’abord la requête des compléments dans les Paramètres.'}</p>
+      <p class="note">Une pièce est « Oui » pour une coche si ses règles sont vraies. L'état de départ est celui de la coche à l'ouverture de PDRTec.${COLONNES_COMPLEMENTS.length ? '' : ' Pour tester le stock, ajoutez d’abord la requête des compléments dans les Paramètres.'}</p>
+      <div class="edition-coche"><div class="ligne-coche"><b class="nom-fixe">Supprimée</b><span class="na">emplacement « SUPPRIME »</span><span class="espace"></span><label class="depart">au départ <select class="fin" data-depart="supprimees">${opts(ETATS, departSupprimees)}</select></label></div></div>
       ${coches.map((c, i) => `<div class="edition-coche">
-        <div class="ligne-coche"><input type="text" value="${esc(c.nom)}" data-i="${i}" data-c="nom" placeholder="Nom de la coche"><select data-i="${i}" data-c="lien"><option value="ou"${c.lien !== 'et' ? ' selected' : ''}>une règle suffit (OU)</option><option value="et"${c.lien === 'et' ? ' selected' : ''}>toutes les règles (ET)</option></select><button class="btn small" type="button" data-a="retirer" data-i="${i}">Retirer</button></div>
-        ${(c.regles || []).map((r, j) => `<div class="ligne-regle"><select data-i="${i}" data-j="${j}" data-r="champ">${options_(champs, r.champ)}</select><select data-i="${i}" data-j="${j}" data-r="test">${options_(TESTS, r.test)}</select><input type="text" value="${esc((r.valeurs || []).join(', '))}" data-i="${i}" data-j="${j}" data-r="valeurs" placeholder="valeurs"><button class="btn small" type="button" data-a="retirer-regle" data-i="${i}" data-j="${j}">✕</button></div>`).join('')}
-        <button class="btn small" type="button" data-a="regle" data-i="${i}">+ Règle</button>
+        <div class="ligne-coche"><input class="fin nom-coche-edit" type="text" value="${esc(c.nom)}" data-i="${i}" data-n="nom" placeholder="Nom de la coche">${lien(String(i), c.lien)}<label class="depart">au départ <select class="fin" data-depart="${i}">${opts(ETATS, c.depart || 'tous')}</select></label><button class="btn mini" type="button" data-a="supprimer" data-i="${i}">Retirer</button></div>
+        ${regles(String(i), c.regles || [], 1)}
       </div>`).join('')}
       <div class="actions" style="justify-content:flex-start"><button class="btn small" type="button" data-a="ajouter">+ Coche</button><button class="btn small primary" type="button" data-a="enregistrer">Enregistrer</button></div>`
   }
   dlg.addEventListener('change', (e) => {
-    const t = e.target, i = Number(t.dataset.i)
-    if (t.dataset.c) coches[i][t.dataset.c] = t.value
-    if (t.dataset.r) coches[i].regles[Number(t.dataset.j)][t.dataset.r] = t.dataset.r === 'valeurs' ? t.value.split(',').map((v) => v.trim()).filter(Boolean) : t.value
+    const t = e.target
+    if (t.dataset.n) coches[Number(t.dataset.i)].nom = t.value
+    if (t.dataset.lien) liste(t.dataset.lien).lien = t.value
+    if (t.dataset.depart) { if (t.dataset.depart === 'supprimees') departSupprimees = t.value; else coches[Number(t.dataset.depart)].depart = t.value }
+    if (t.dataset.r) {
+      const parts = t.dataset.c.split('.'), j = Number(parts.pop()), r = liste(parts.join('.')).regles[j]
+      r[t.dataset.r] = t.dataset.r === 'valeurs' ? t.value.split(',').map((v) => v.trim()).filter(Boolean) : t.value
+      if (t.dataset.r === 'test') dessiner()
+    }
   })
   dlg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]')
     if (!b) return
-    const i = Number(b.dataset.i)
-    if (b.dataset.a === 'fermer') return dlg.close()
-    if (b.dataset.a === 'ajouter') coches.push({ id: 'c' + Date.now().toString(36), nom: 'Nouvelle coche', lien: 'ou', regles: [{ champ: 'code', test: 'commence', valeurs: [] }] })
-    if (b.dataset.a === 'retirer') coches.splice(i, 1)
-    if (b.dataset.a === 'regle') coches[i].regles.push({ champ: 'code', test: 'commence', valeurs: [] })
-    if (b.dataset.a === 'retirer-regle') coches[i].regles.splice(Number(b.dataset.j), 1)
-    if (b.dataset.a === 'enregistrer') {
+    const a = b.dataset.a
+    if (a === 'fermer') return dlg.close()
+    if (a === 'ajouter') coches.push({ id: 'c' + Date.now().toString(36), nom: 'Nouvelle coche', lien: 'ou', depart: 'tous', regles: [{ champ: 'code', test: 'commence', valeurs: [] }] })
+    if (a === 'supprimer') coches.splice(Number(b.dataset.i), 1)
+    if (a === 'regle') (liste(b.dataset.c).regles ||= []).push({ champ: 'code', test: 'commence', valeurs: [] })
+    if (a === 'groupe') (liste(b.dataset.c).regles ||= []).push({ lien: 'et', regles: [{ champ: 'code', test: 'commence', valeurs: [] }] })
+    if (a === 'retirer') { const parts = b.dataset.c.split('.'), j = Number(parts.pop()); liste(parts.join('.')).regles.splice(j, 1) }
+    if (a === 'enregistrer') {
       SETTINGS.coches = coches.filter((c) => c.nom.trim())
-      saveSettings(); dlg.close(); render()
+      SETTINGS.supprimees = departSupprimees
+      saveSettings(); etatsDeDepart(); dlg.close(); render()
       return notifier('Coches enregistrées')
     }
     dessiner()
@@ -862,15 +976,29 @@ function regleVraie(p, r) {
     }
   })
 }
-function cocheVraie(p, c) {
-  const regles = (c.regles || []).filter((r) => r.champ && r.test)
-  if (!regles.length) return false
-  return c.lien === 'et' ? regles.every((r) => regleVraie(p, r)) : regles.some((r) => regleVraie(p, r))
+// Une liste de règles et de groupes ({ lien, regles }), liés par OU (une suffit) ou ET (toutes).
+function groupeVrai(p, regles, lien) {
+  const utiles = (regles || []).filter((r) => (r.regles ? r.regles.length : r.champ && r.test))
+  if (!utiles.length) return false
+  const vraie = (r) => (r.regles ? groupeVrai(p, r.regles, r.lien) : regleVraie(p, r))
+  return lien === 'et' ? utiles.every(vraie) : utiles.some(vraie)
+}
+const cocheVraie = (p, c) => groupeVrai(p, c.regles, c.lien)
+
+// Chaque coche démarre dans l'état choisi pour elle (Tous, Oui ou Non) à l'ouverture de PDRTec.
+function etatsDeDepart() {
+  cochesEtat = { supprimees: SETTINGS.supprimees || 'tous' }
+  for (const c of SETTINGS.coches || []) cochesEtat[c.id] = c.depart || 'tous'
 }
 
-// Les coches à droite des menus : « Supprimée », puis celles des réglages. Chaque coche : Tous / Oui / Non.
+// Bloc Options replié ou ouvert : retenu sur ce poste.
+let optionsRepliees = false
+try { optionsRepliees = localStorage.getItem('pdrtec-options-repliees') === '1' } catch {}
+
+// Les coches du bloc Options : « Supprimée », puis celles des réglages. Chaque coche : Tous / Oui / Non.
+const toutesLesCoches = () => [{ id: 'supprimees', nom: 'Supprimée' }, ...(SETTINGS.coches || [])]
 function panneauCoches() {
-  const toutes = [{ id: 'supprimees', nom: 'Supprimée' }, ...(SETTINGS.coches || [])]
+  const toutes = toutesLesCoches()
   const lignes = toutes.map((c) => {
     const e = cochesEtat[c.id] || 'tous'
     const base = PIECES.filter((p) => match(p, 'coche:' + c.id))
@@ -878,7 +1006,7 @@ function panneauCoches() {
     const bouton = (v, texte, n) => `<button type="button" class="seg${e === v ? ' on' : ''}" data-coche="${esc(c.id)}" data-v="${v}">${texte}${n !== null ? ` <small>${n}</small>` : ''}</button>`
     return `<div class="coche"><span class="nom-coche" title="${esc(c.nom)}">${esc(c.nom)}</span><span class="segs">${bouton('tous', 'Tous', null)}${bouton('oui', 'Oui', oui)}${bouton('non', 'Non', base.length - oui)}</span></div>`
   }).join('')
-  return `<div class="coches-panel">${configuration ? '<button type="button" class="btn small" id="editerCoches">Régler les coches…</button>' : ''}${lignes}</div>`
+  return `<div class="coches-panel">${lignes}${configuration ? '<button type="button" class="btn small" id="editerCoches">Régler les coches…</button>' : ''}</div>`
 }
 
 function match(p, skipMain, skipChar) {
@@ -941,6 +1069,11 @@ function render() {
   ].filter((b) => b.html)
   $('filters').innerHTML = ordonner(blocs, SETTINGS.disposition?.principaux).map((b) => b.html).join('')
   $('coches').innerHTML = panneauCoches()
+  const actives = toutesLesCoches().filter((c) => (cochesEtat[c.id] || 'tous') !== 'tous')
+  $('optionsActives').textContent = actives.length ? `(${actives.length} active${actives.length > 1 ? 's' : ''})` : ''
+  $('panelOptions').classList.toggle('repliees', optionsRepliees)
+  $('titreOptions').setAttribute('aria-expanded', String(!optionsRepliees))
+  $('titreOptions').onclick = () => { optionsRepliees = !optionsRepliees; try { localStorage.setItem('pdrtec-options-repliees', optionsRepliees ? '1' : '0') } catch {}; render() }
   $('coches').querySelectorAll('button[data-coche]').forEach((b) => (b.onclick = () => { cochesEtat[b.dataset.coche] = b.dataset.v; render() }))
   if ($('editerCoches')) $('editerCoches').onclick = editerCoches
   $('filters').querySelectorAll('select[data-k]').forEach((s) => (s.onchange = () => { const k = s.dataset.k; s.value ? (sel[k] = s.value) : delete sel[k]; render() }))
@@ -998,7 +1131,23 @@ function render() {
     ? `<textarea id="descriptionFiche" class="description-fiche" placeholder="Description de la fiche « ${esc(sel.modele)} » (affichée ici, sous Caractéristiques)">${esc(SETTINGS.descriptions?.[sel.modele] || '')}</textarea>`
     : SETTINGS.descriptions?.[sel.modele] ? `<p class="description-fiche">${esc(SETTINGS.descriptions[sel.modele]).replace(/\n/g, '<br>')}</p>` : '')
   $('charfilters').innerHTML = (description || '') + (onlyNoCat ? groupHtml('', fGroups.get('') || [])
-    : [...fGroups].map(([cat, keys]) => { const html = groupHtml(cat, keys); return html ? `<div class="fgroup"><div class="kcat">${esc(cat || 'Autres')}</div><div class="filters">${html}</div></div>` : '' }).join('')) + revHtml
+    : ordonner([...fGroups].map(([cat, keys]) => ({ id: cat, keys })), SETTINGS.disposition?.blocs?.[sel.modele]).map(({ id: cat, keys }) => {
+      const html = groupHtml(cat, keys)
+      if (!html) return ''
+      // Le nom du bloc : celui du dictionnaire, ou celui donné en mode configuration.
+      const nom = SETTINGS.disposition?.nomsBlocs?.[sel.modele]?.[cat] || cat || 'Autres'
+      const titre = configuration
+        ? `<div class="kcat titre-bloc"><span class="poignee-bloc" draggable="true" title="Glisser pour déplacer le bloc">⠿</span><input class="nom-bloc" data-cat="${esc(cat)}" value="${esc(nom)}" title="Nom du bloc (vide : nom d'origine)"></div>`
+        : `<div class="kcat">${esc(nom)}</div>`
+      return `<div class="fgroup" data-groupe="${esc(cat)}">${titre}<div class="filters">${html}</div></div>`
+    }).join('')) + revHtml
+  $('charfilters').querySelectorAll('input.nom-bloc').forEach((i) => (i.onchange = () => {
+    const noms = { ...(SETTINGS.disposition?.nomsBlocs || {}) }
+    noms[sel.modele] = { ...(noms[sel.modele] || {}), [i.dataset.cat]: i.value.trim() }
+    if (!i.value.trim()) delete noms[sel.modele][i.dataset.cat]
+    SETTINGS.disposition = { ...SETTINGS.disposition, nomsBlocs: noms }
+    saveSettings(); render()
+  }))
   if ($('descriptionFiche')) $('descriptionFiche').onchange = (e) => { SETTINGS.descriptions = { ...SETTINGS.descriptions, [sel.modele]: e.target.value.trim() }; saveSettings() }
   brancherConfiguration()
   ameliorerMenus()
@@ -1015,9 +1164,11 @@ function render() {
   const chips = [...MAIN.filter(([k]) => sel[k]).map(([k, l]) => ({ t: 'm', k, l, v: sel[k] })), ...Object.keys(csel).map((k) => ({ t: 'c', k, l: k, v: csel[k] })),
     ...(tensionMode && tensionVal !== '' ? [{ t: 't', k: 'tension', l: 'Tension', v: tensionVal + ' V' }] : []),
     ...(asel.length && ARBO ? [{ t: 'a', k: 'arbo', l: asel.map((id) => ARBO.noeuds.get(id)?.code).join(' › '), v: libelleNoeud(ARBO.noeuds.get(asel.at(-1))) }] : []),
-    ...(REV ? ['A', 'B'].flatMap((sd) => Object.keys(rsel[sd]).map((n) => { const L = REV.labels.find((x) => x.n === n); return { t: 'r', s: sd, n, l: (sd === 'A' ? 'Un côté' : "L'autre côté") + ' · ' + (L ? L.label : n), v: rsel[sd][n] } })) : [])]
+    ...(REV ? ['A', 'B'].flatMap((sd) => Object.keys(rsel[sd]).map((n) => { const L = REV.labels.find((x) => x.n === n); return { t: 'r', s: sd, n, l: (sd === 'A' ? 'Un côté' : "L'autre côté") + ' · ' + (L ? L.label : n), v: rsel[sd][n] } })) : []),
+    // Les coches réglées sur Oui ou Non, visibles même quand le bloc Options est replié.
+    ...toutesLesCoches().filter((c) => (cochesEtat[c.id] || 'tous') !== 'tous').map((c) => ({ t: 'k', k: c.id, l: c.nom, v: `${c.nom} : ${cochesEtat[c.id] === 'oui' ? 'oui' : 'non'}` }))]
   $('chips').innerHTML = chips.map((c, i) => `<button class="chip" type="button" data-i="${i}" title="${esc(c.l)}">${esc(c.v)}<span>✕</span></button>`).join('')
-  $('chips').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { const c = chips[b.dataset.i]; if (c.t === 'm') delete sel[c.k]; else if (c.t === 'a') asel = []; else if (c.t === 't') tensionVal = ''; else if (c.t === 'r') delete rsel[c.s][c.n]; else delete csel[c.k]; render() }))
+  $('chips').querySelectorAll('.chip').forEach((b) => (b.onclick = () => { const c = chips[b.dataset.i]; if (c.t === 'm') delete sel[c.k]; else if (c.t === 'k') cochesEtat[c.k] = 'tous'; else if (c.t === 'a') asel = []; else if (c.t === 't') tensionVal = ''; else if (c.t === 'r') delete rsel[c.s][c.n]; else delete csel[c.k]; render() }))
 
   // Tableau, triable en cliquant sur une colonne (pastille ▲▼ = colonne active)
   if (sortIsChar && !(sortIsChar === 'x' ? COLONNES_COMPLEMENTS : chars).includes(sortKey)) { sortKey = 'des'; sortIsChar = false; sortDir = 1 }
@@ -1028,30 +1179,40 @@ function render() {
     if (ea && eb) return 0; if (ea) return 1; if (eb) return -1
     return sortDir * String(va).localeCompare(String(vb), 'fr', { numeric: true })
   })
-  const nHidden = 0
-  derniereListe = { res, chars, extras: COLONNES_COMPLEMENTS }
-  $('count').innerHTML = `<b>${res.length}</b> / ${PIECES.length - nHidden} pièces` + (nHidden ? ` · ${nHidden} supprimée${nHidden > 1 ? 's' : ''} masquée${nHidden > 1 ? 's' : ''}` : '')
-  const cols = [['code', 'Code'], ['des', 'Désignation'], ['empl', 'Emplacement'], ['famille', 'Famille'], ['sousfamille', 'Sous-famille']]
-  const th = (key, label, isChar) => {
-    const on = sortIsChar === isChar && sortKey === key
-    return `<th class="${isChar === 'x' ? 'extra' : isChar ? 'char' : ''}" data-key="${esc(key)}" data-char="${isChar === 'x' ? 'x' : isChar ? 1 : 0}">${esc(label)}${on ? (sortDir === 1 ? ' ▲' : ' ▼') : ''}<span class="poignee-col" title="Glisser pour régler la largeur ; double-clic : largeur automatique"></span></th>`
+  $('count').innerHTML = `<b>${res.length}</b> / ${PIECES.length} pièces`
+  // Les colonnes du tableau : les fixes, les caractéristiques de la fiche, les compléments (ex. le stock).
+  // L'ordre et les colonnes masquées sont propres à ce poste (« Colonnes », glisser un titre).
+  const cell = (v) => (v && v !== NA ? esc(v) : '<span class="na">—</span>')
+  // Famille ou sous-famille proposée par PDRTec (absente de la GMAO) : en jaune, avec la raison au survol.
+  const cellClasse = (p, k) => (p.propose?.[k] ? `<span class="propose" title="${esc(explicationProposition(p, k))}">${esc(p[k])}</span>` : cell(p[k]))
+  const toutes = [
+    { cle: 'code', titre: 'Code', tri: ['code', false], classe: 'code', html: (p) => `<span class="caret">›</span>${hl(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button>`, brut: (p) => p.code },
+    { cle: 'des', titre: 'Désignation', tri: ['des', false], classe: 'des', html: (p) => hl(p.des), brut: (p) => p.des },
+    { cle: 'empl', titre: 'Emplacement', tri: ['empl', false], classe: 'empl', html: (p) => emplHtml(p.empl), brut: (p) => p.empl },
+    { cle: 'famille', titre: 'Famille', tri: ['famille', false], html: (p) => cellClasse(p, 'famille'), brut: (p) => p.famille },
+    { cle: 'sousfamille', titre: 'Sous-famille', tri: ['sousfamille', false], html: (p) => cellClasse(p, 'sousfamille'), brut: (p) => p.sousfamille },
+    ...chars.map((c) => ({ cle: 'c:' + c, titre: c, tri: [c, true], classe: 'char', html: (p) => cell(p.car[c]), brut: (p) => p.car[c] })),
+    ...COLONNES_COMPLEMENTS.map((c) => ({ cle: 'x:' + c, titre: c.charAt(0).toUpperCase() + c.slice(1), tri: [c, 'x'], classe: 'extra', nombre: true, html: (p) => (p.extra?.[c] == null || p.extra[c] === '' ? '<span class="na">—</span>' : esc(nombreLisible(p.extra[c]))), brut: (p) => p.extra?.[c] })),
+  ]
+  const colonnes = ordonner(toutes.map((c) => ({ ...c, id: c.cle })), choixColonnes.ordre).filter((c) => !choixColonnes.masquees.includes(c.cle))
+  derniereListe = { res, colonnes, toutes }
+  const th = (c) => {
+    const [cle, genre] = c.tri
+    const on = sortIsChar === genre && sortKey === cle
+    return `<th class="${c.classe === 'char' ? 'char' : c.classe === 'extra' ? 'extra' : ''}" draggable="true" data-col="${esc(c.cle)}" data-key="${esc(cle)}" data-char="${genre === 'x' ? 'x' : genre ? 1 : 0}">${esc(c.titre)}${on ? (sortDir === 1 ? ' ▲' : ' ▼') : ''}<span class="poignee-col" title="Glisser pour régler la largeur ; double-clic : largeur automatique"></span></th>`
   }
-  // Les colonnes des compléments (ex. le stock) au bout de chaque ligne.
-  const extras = COLONNES_COMPLEMENTS
-  const titreExtra = (c) => c.charAt(0).toUpperCase() + c.slice(1)
-  $('thead').innerHTML = '<tr>' + cols.map(([k, l]) => th(k, l, false)).join('') + chars.map((c) => th(c, c, true)).join('') + extras.map((c) => th(c, titreExtra(c), 'x')).join('') + '</tr>'
+  $('thead').innerHTML = '<tr>' + colonnes.map(th).join('') + '</tr>'
   appliquerLargeurs()
+  brancherOrdreColonnes(colonnes)
   $('thead').querySelectorAll('th[data-key]').forEach((t) => (t.onclick = (e) => {
     if (e.target.closest('.poignee-col')) return
     const key = t.dataset.key, isChar = t.dataset.char === 'x' ? 'x' : t.dataset.char === '1'
     if (sortKey === key && sortIsChar === isChar) sortDir *= -1; else { sortKey = key; sortIsChar = isChar; sortDir = 1 }
     render()
   }))
-  const n = cols.length + chars.length + extras.length, cell = (v) => (v && v !== NA ? esc(v) : '<span class="na">—</span>')
-  // Famille ou sous-famille proposée par PDRTec (absente de la GMAO) : en jaune, avec la raison au survol.
-  const cellClasse = (p, k) => (p.propose?.[k] ? `<span class="propose" title="${esc(explicationProposition(p, k))}">${esc(p[k])}</span>` : cell(p[k]))
+  const n = Math.max(1, colonnes.length)
   $('tbody').innerHTML = res.length ? res.slice(0, 500).map((p, i) =>
-    `<tr class="row" tabindex="0" data-i="${i}"><td class="code"><span class="caret">›</span>${hl(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button></td><td class="des">${hl(p.des)}</td><td class="empl">${emplHtml(p.empl)}</td><td>${cellClasse(p, 'famille')}</td><td>${cellClasse(p, 'sousfamille')}</td>${chars.map((c) => `<td>${cell(p.car[c])}</td>`).join('')}${extras.map((c) => `<td class="extra">${p.extra?.[c] == null || p.extra[c] === '' ? '<span class="na">—</span>' : esc(nombreLisible(p.extra[c]))}</td>`).join('')}</tr>`
+    `<tr class="row" tabindex="0" data-i="${i}">${colonnes.map((c) => `<td${c.classe ? ` class="${c.classe}"` : ''}>${c.html(p)}</td>`).join('')}</tr>`
     + `<tr class="detail" hidden><td colspan="${n}">${detail(p)}</td></tr>`).join('')
     : PIECES.length ? `<tr><td class="empty" colspan="${n}">Aucune pièce ne correspond. Retire un filtre pour élargir.</td></tr>`
       : `<tr><td class="empty" colspan="${n}">Aucune donnée chargée. « Actualiser depuis la base », ou glisse un export Excel du rapport ici.</td></tr>`
@@ -1233,7 +1394,6 @@ function ouvrirParametres() {
   $('stgServer').value = SETTINGS.serveur
   $('stgLien').value = SETTINGS.modeleLien
   $('stgReversible').checked = !!SETTINGS.reversible
-  $('stgHideDeleted').checked = !!SETTINGS.masquerSupprimes
   $('stgPropositions').checked = SETTINGS.propositions !== false
   renderSettingsModels()
   $('settings').showModal()
@@ -1273,9 +1433,10 @@ function brancherEvenements() {
   $('stgServer').oninput = () => { SETTINGS.serveur = $('stgServer').value.trim(); saveSettings(); render() }
   $('stgLien').oninput = () => { SETTINGS.modeleLien = $('stgLien').value.trim(); saveSettings(); render() }
   $('stgReversible').onchange = () => { SETTINGS.reversible = $('stgReversible').checked; rsel = { A: {}, B: {} }; saveSettings(); render() }
-  $('stgHideDeleted').onchange = () => { SETTINGS.masquerSupprimes = $('stgHideDeleted').checked; saveSettings(); render() }
   $('stgPropositions').onchange = () => { SETTINGS.propositions = $('stgPropositions').checked; appliquerPropositions(); sel = {}; csel = {}; saveSettings(); render() }
   brancherDefilHaut()
+  $('choixColonnes').onclick = choisirColonnes
+  window.addEventListener('resize', majDefilHaut)
   $('agrandir').onclick = () => agrandirTable(!document.querySelector('.pdrtec').classList.contains('table-agrandie'))
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.pdrtec.table-agrandie')) agrandirTable(false) })
   $('exporterExcel').onclick = () => exporterListe('xlsx')
@@ -1292,8 +1453,12 @@ function brancherEvenements() {
   }
   $('stgConfiguration').onchange = () => { basculerConfiguration($('stgConfiguration').checked); if (configuration) $('settings').close() }
   $('dispositionDefaut').onclick = () => {
-    SETTINGS.disposition = { principaux: [], caracteristiques: { ...(SETTINGS.disposition?.caracteristiques || {}) } }
-    if (sel.modele) delete SETTINGS.disposition.caracteristiques[sel.modele]
+    SETTINGS.disposition = { ...SETTINGS.disposition, principaux: [], caracteristiques: { ...(SETTINGS.disposition?.caracteristiques || {}) } }
+    if (sel.modele) {
+      delete SETTINGS.disposition.caracteristiques[sel.modele]
+      SETTINGS.disposition.blocs = { ...(SETTINGS.disposition.blocs || {}) }; delete SETTINGS.disposition.blocs[sel.modele]
+      SETTINGS.disposition.nomsBlocs = { ...(SETTINGS.disposition.nomsBlocs || {}) }; delete SETTINGS.disposition.nomsBlocs[sel.modele]
+    }
     saveSettings(); render()
     notifier('Disposition par défaut rétablie')
   }

@@ -29,7 +29,7 @@ const REGLAGES_DEFAUT = {
   //   champ : code, des, empl, obs, obsMachine, ou une colonne de la requête des compléments
   //   test  : commence, contient, egal, superieur, inferieur, vide, non_vide
   coches: [],
-  supprimees: 'non',      // coche « Supprimée » au départ : tous | oui | non
+  supprimees: '',         // coche « Supprimée » au départ : tous | oui | non (vide : d'après masquerSupprimes)
   // Mode configuration : ordre des menus, descriptions des fiches, images des choix
   disposition: { principaux: [], caracteristiques: {} },
   descriptions: {},       // { fiche technique : texte affiché sous « Caractéristiques » }
