@@ -1,4 +1,4 @@
-// Le menu de PDRTec, chargé par la coquille commune de KTEC (page /pdrtec/).
+// Le menu de PDRTEC, chargé par la coquille commune de KTEC (page /pdrtec/).
 
 import recherche from '../blocs/recherche/vue.js'
 import aide from '../blocs/aide/vue.js'

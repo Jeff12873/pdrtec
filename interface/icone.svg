@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Icône de PDRTec : le barbu de la « Recherche PDR du Barbu », dans le cadre commun des applications KTEC. -->
+  <!-- Icône de PDRTEC : le barbu de la « Recherche PDR du Barbu », dans le cadre commun des applications KTEC. -->
   <rect x="16" y="16" width="480" height="480" rx="112" fill="#122019" stroke="#4ade80" stroke-width="16"/>
   <g transform="translate(96 76) scale(4)" fill="none" stroke="#4ade80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M20.5,38 C19,20 28,8 40,8 C52,8 61,20 59.5,38"/>

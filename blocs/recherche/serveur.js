@@ -1,4 +1,4 @@
-// PDRTec : les données de la recherche de pièces, lues en direct sur la base de la GMAO.
+// PDRTEC : les données de la recherche de pièces, lues en direct sur la base de la GMAO.
 //
 // Tout ce qui est propre au site est dans le fichier .ktec, jamais dans le programme :
 //   « pdrtec.requete »  → la requête du rapport de recherche (une ligne par caractéristique de pièce)
@@ -75,7 +75,7 @@ export function routes(r) {
     const octets = await ctx.octets()
     if (octets.length > 2 * 1024 * 1024) throw new ErreurHttp(400, 'Image trop lourde (2 Mo au plus).')
     const unique = `${Date.now().toString(36)}-${nom}`
-    enregistrerFichier('pdrtec-images', unique, octets, 'PDRTec')
+    enregistrerFichier('pdrtec-images', unique, octets, 'PDRTEC')
     return { nom: unique }
   })
   r.get('/api/images/:nom', (ctx) => {
@@ -115,7 +115,7 @@ export function routes(r) {
       arbre: a.lignes.map((x) => ia.map((i) => (i < 0 ? null : x[i]))),
       liens: l.lignes.map((x) => il.map((i) => x[i])),
     }
-    journal(`PDRTec : arborescence de ${cacheArbo.arbre.length} nœuds, ${cacheArbo.liens.length} pièces montées`)
+    journal(`PDRTEC : arborescence de ${cacheArbo.arbre.length} nœuds, ${cacheArbo.liens.length} pièces montées`)
     return { arbre: cacheArbo.arbre, liens: cacheArbo.liens, reglee: true }
   })
 
@@ -148,7 +148,7 @@ export function routes(r) {
     if (cache && cache.sql === sql && !ctx.query.rafraichir) return sansSql(cache)
     const resultat = await executerRequete(sansCommentaires(sql), LIGNES_MAX)
     cache = { sql, colonnes: resultat.colonnes.map((c) => c.nom), lignes: resultat.lignes, date: new Date().toISOString(), dureeMs: resultat.dureeMs, tronque: resultat.tronque }
-    journal(`PDRTec : ${cache.lignes.length} lignes lues en ${cache.dureeMs} ms`)
+    journal(`PDRTEC : ${cache.lignes.length} lignes lues en ${cache.dureeMs} ms`)
     return sansSql(cache)
   })
 }

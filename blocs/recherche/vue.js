@@ -1,4 +1,4 @@
-// PDRTec : la recherche de pièces de rechange (ex « Recherche PDR du Barbu »).
+// PDRTEC : la recherche de pièces de rechange (ex « Recherche PDR du Barbu »).
 //
 // Les données viennent de la base de la GMAO, par la requête rangée dans le fichier .ktec (une ligne par
 // caractéristique de pièce, regroupées ici par code pièce). En secours, sans connexion : un export Excel du
@@ -146,7 +146,7 @@ const PAGE = `
   <div class="stgrow">
     <label for="stgPropositions">Familles proposées</label>
     <label class="stgcheck"><input type="checkbox" id="stgPropositions"> Proposer une famille et une sous-famille aux pièces qui n'en ont pas</label>
-    <p class="note">PDRTec apprend sur les pièces déjà classées (mots de la désignation, modèle de fiche) et propose la famille et la sous-famille les plus probables aux pièces qui n'en ont pas, quand il en est assez sûr. Les propositions sont <b class="propose">en jaune</b>, servent aux filtres et au tableau, et ne sont jamais écrites dans la GMAO : à reporter dans la GMAO si elles sont justes.</p>
+    <p class="note">PDRTEC apprend sur les pièces déjà classées (mots de la désignation, modèle de fiche) et propose la famille et la sous-famille les plus probables aux pièces qui n'en ont pas, quand il en est assez sûr. Les propositions sont <b class="propose">en jaune</b>, servent aux filtres et au tableau, et ne sont jamais écrites dans la GMAO : à reporter dans la GMAO si elles sont justes.</p>
   </div>
   <div class="stgrow">
     <label>Modèles avec tension mini/maxi</label>
@@ -535,7 +535,7 @@ function appliquerPropositions() {
 function explicationProposition(p, k) {
   const x = p.prop?.[k] || p.prop?.famille || p.prop?.sousfamille
   if (!x) return ''
-  return `Proposée par PDRTec (${Math.round(x.confiance * 100)} %), comme ${x.pieces} pièce${x.pieces > 1 ? 's' : ''} classée${x.pieces > 1 ? 's' : ''} ainsi${x.raisons.length ? ` : ${x.raisons.join(', ')}` : ''}`
+  return `Proposée par PDRTEC (${Math.round(x.confiance * 100)} %), comme ${x.pieces} pièce${x.pieces > 1 ? 's' : ''} classée${x.pieces > 1 ? 's' : ''} ainsi${x.raisons.length ? ` : ${x.raisons.join(', ')}` : ''}`
 }
 
 // ---------------------------------------------------------------- filtres et tableau
@@ -622,7 +622,7 @@ async function exporterListe(format) {
   feuille['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: lignes.length, c: titres.length - 1 } }) }
   const d = new Date()
   const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  const nom = `PDRTec ${date}${sel.sousfamille ? ' ' + sel.sousfamille.replace(/[\\/:*?"<>|]/g, '-') : ''}`
+  const nom = `PDRTEC ${date}${sel.sousfamille ? ' ' + sel.sousfamille.replace(/[\\/:*?"<>|]/g, '-') : ''}`
   if (format === 'csv') {
     const texte = '\ufeff' + XLSX.utils.sheet_to_csv(feuille, { FS: ';', RS: '\r\n' })
     const lien = document.createElement('a')
@@ -897,7 +897,7 @@ function editerCoches() {
   }).join('')}<div class="ajout-regles"><button class="btn mini" type="button" data-a="regle" data-c="${chemin}">+ Règle</button>${profondeur < 3 ? `<button class="btn mini" type="button" data-a="groupe" data-c="${chemin}">+ Groupe ( … )</button>` : ''}</div></div>`
   const dessiner = () => {
     dlg.innerHTML = `<div class="dhead"><h2>Les coches</h2><button class="btn small" data-a="fermer" type="button">Fermer</button></div>
-      <p class="note">Une pièce est « Oui » pour une coche si ses règles sont vraies. L'état de départ est celui de la coche à l'ouverture de PDRTec.${COLONNES_COMPLEMENTS.length ? '' : ' Pour tester le stock, ajoutez d’abord la requête des compléments dans les Paramètres.'}</p>
+      <p class="note">Une pièce est « Oui » pour une coche si ses règles sont vraies. L'état de départ est celui de la coche à l'ouverture de PDRTEC.${COLONNES_COMPLEMENTS.length ? '' : ' Pour tester le stock, ajoutez d’abord la requête des compléments dans les Paramètres.'}</p>
       <div class="edition-coche"><div class="ligne-coche"><b class="nom-fixe">Supprimée</b><span class="na">emplacement « SUPPRIME »</span><span class="espace"></span><label class="depart">au départ <select class="fin" data-depart="supprimees">${opts(ETATS, departSupprimees)}</select></label></div></div>
       ${coches.map((c, i) => `<div class="edition-coche">
         <div class="ligne-coche"><input class="fin nom-coche-edit" type="text" value="${esc(c.nom)}" data-i="${i}" data-n="nom" placeholder="Nom de la coche">${lien(String(i), c.lien)}<label class="depart">au départ <select class="fin" data-depart="${i}">${opts(ETATS, c.depart || 'tous')}</select></label><button class="btn mini" type="button" data-a="supprimer" data-i="${i}">Retirer</button></div>
@@ -988,7 +988,7 @@ function groupeVrai(p, regles, lien) {
 }
 const cocheVraie = (p, c) => groupeVrai(p, c.regles, c.lien)
 
-// Chaque coche démarre dans l'état choisi pour elle (Tous, Oui ou Non) à l'ouverture de PDRTec.
+// Chaque coche démarre dans l'état choisi pour elle (Tous, Oui ou Non) à l'ouverture de PDRTEC.
 function etatsDeDepart() {
   cochesEtat = { supprimees: SETTINGS.supprimees || 'tous' }
   for (const c of SETTINGS.coches || []) cochesEtat[c.id] = c.depart || 'tous'
@@ -1186,7 +1186,7 @@ function render() {
   // Les colonnes du tableau : les fixes, les caractéristiques de la fiche, les compléments (ex. le stock).
   // L'ordre et les colonnes masquées sont propres à ce poste (« Colonnes », glisser un titre).
   const cell = (v) => (v && v !== NA ? esc(v) : '<span class="na">—</span>')
-  // Famille ou sous-famille proposée par PDRTec (absente de la GMAO) : en jaune, avec la raison au survol.
+  // Famille ou sous-famille proposée par PDRTEC (absente de la GMAO) : en jaune, avec la raison au survol.
   const cellClasse = (p, k) => (p.propose?.[k] ? `<span class="propose" title="${esc(explicationProposition(p, k))}">${esc(p[k])}</span>` : cell(p[k]))
   const toutes = [
     { cle: 'code', titre: 'Code', tri: ['code', false], classe: 'code', html: (p) => `<span class="caret">›</span>${hl(p.code)}<button type="button" class="cpy" data-code="${esc(p.code)}" title="Copier le code" aria-label="Copier le code ${esc(p.code)}">${ICON_COPY}</button>`, brut: (p) => p.code },
@@ -1337,7 +1337,7 @@ function copyCode(btn) {
 
 // ---------------------------------------------------------------- export Excel (secours, sans connexion)
 
-// SheetJS n'est chargé qu'au premier fichier (embarqué avec PDRTec : pas besoin d'Internet).
+// SheetJS n'est chargé qu'au premier fichier (embarqué avec PDRTEC : pas besoin d'Internet).
 let sheetjs = null
 function chargerSheetJS() {
   sheetjs ??= new Promise((ok, echec) => {

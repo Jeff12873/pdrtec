@@ -1,4 +1,4 @@
-# PDRTec
+# PDRTEC
 
 Application de la suite **[KTEC](https://github.com/Jeff12873/ktec)** : la recherche de pièces de rechange
 (ex « Recherche PDR du Barbu »), en direct sur la base de la GMAO.
@@ -20,13 +20,13 @@ coquille vide. La requête se colle dans les Paramètres ou se lit directement d
 
 ## Installer
 
-PDRTec s'installe avec KTEC (voir le [dépôt ktec](https://github.com/Jeff12873/ktec)). Il n'a besoin que de Java
+PDRTEC s'installe avec KTEC (voir le [dépôt ktec](https://github.com/Jeff12873/ktec)). Il n'a besoin que de Java
 (pour la connexion MySQL), installé une seule fois pour toutes les applications. À chaque envoi sur `main`, GitHub
 publie `pdrtec.zip` (l'application seule) dans les Releases.
 
 ## Développer
 
-Dans le `reglages-poste.json` de KTEC : `{ "applisDev": ["/chemin/vers/PDRTec"] }`, puis lancer KTEC et ouvrir
+Dans le `reglages-poste.json` de KTEC : `{ "applisDev": ["/chemin/vers/PDRTEC"] }`, puis lancer KTEC et ouvrir
 http://127.0.0.1:47700/pdrtec/.
 
 | Dossier | Contenu |
