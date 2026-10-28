@@ -158,6 +158,7 @@ const PAGE = `
     <p class="note">Une ligne par caractéristique de pièce, avec au moins les colonnes codePiece, designationPiece et designationLibel (et, si possible : observationPiece, modeleFichetechnique, valeurLibel, designationFamille, designationSousfamille, categorieDico, emplacementPiece, observationMachine, lienPhoto, extensionPhoto, piecesJointes, extensionPiecesJointes).</p>
     <div class="actions" style="justify-content:flex-start">
       <button class="btn small" id="stgRequeteOk" type="button">Enregistrer la requête</button>
+      <button class="btn small" id="stgRequeteAssistant" type="button" title="Construire la requête sans écrire de SQL">Assistant</button>
       <label class="btn small" for="stgRptdesign">La lire dans un rapport BIRT (.rptdesign)</label>
       <input type="file" id="stgRptdesign" accept=".rptdesign" hidden>
     </div>
@@ -168,6 +169,7 @@ const PAGE = `
     <textarea id="stgComplements" class="stginput" spellcheck="false" placeholder="SELECT … AS codePiece, … AS stock …"></textarea>
     <div class="actions" style="justify-content:flex-start">
       <button class="btn small" id="stgComplementsOk" type="button">Enregistrer la requête des compléments</button>
+      <button class="btn small" id="stgComplementsAssistant" type="button" title="Construire la requête sans écrire de SQL">Assistant</button>
     </div>
   </div>
   <div class="stgrow">
@@ -177,6 +179,8 @@ const PAGE = `
     <textarea id="stgLiens" class="stginput" spellcheck="false" placeholder="Les pièces montées : une ligne par pièce et par machine, colonnes codePiece, machine"></textarea>
     <div class="actions" style="justify-content:flex-start">
       <button class="btn small" id="stgArboOk" type="button">Enregistrer les requêtes de l'arborescence</button>
+      <button class="btn small" id="stgArbreAssistant" type="button" title="Construire la requête de l'arbre sans écrire de SQL">Assistant : l'arbre</button>
+      <button class="btn small" id="stgLiensAssistant" type="button" title="Construire la requête des pièces montées sans écrire de SQL">Assistant : les pièces montées</button>
     </div>
   </div>
 </dialog>
@@ -1475,6 +1479,23 @@ function brancherEvenements() {
       notifier(erreur.message, 'erreur')
     }
   }
+  // L'assistant de requêtes de KTEC (0.6 et plus) : il remplit la zone ; on enregistre ensuite comme d'habitude.
+  const assistant = (zone, titre, champs, consigne) => async () => {
+    const module = await import('/socle/requeteur.js').catch(() => null)
+    if (!module) return notifier('Mettez KTEC à jour pour avoir l’assistant de requêtes.', 'erreur')
+    const sql = await module.ouvrirRequeteur({ titre, champs, sql: $(zone).value, consigne })
+    if (sql !== null) $(zone).value = sql
+  }
+  const champ = (nom, libelle, obligatoire = false, aide = '') => ({ nom, libelle, obligatoire, aide })
+  $('stgRequeteAssistant').onclick = assistant('stgRequete', 'Requête de recherche des pièces', [
+    champ('codePiece', 'Code de la pièce', true), champ('designationPiece', 'Désignation de la pièce', true), champ('designationLibel', 'Caractéristique (libellé)', true, 'une ligne par caractéristique'),
+    champ('valeurLibel', 'Valeur de la caractéristique'), champ('observationPiece', 'Observation de la pièce'), champ('modeleFichetechnique', 'Modèle de fiche technique'),
+    champ('designationFamille', 'Famille'), champ('designationSousfamille', 'Sous-famille'), champ('categorieDico', 'Catégorie'), champ('emplacementPiece', 'Emplacement'),
+    champ('observationMachine', 'Machines'), champ('lienPhoto', 'Photo'), champ('extensionPhoto', 'Extension de la photo'), champ('piecesJointes', 'Pièces jointes'), champ('extensionPiecesJointes', 'Extension des pièces jointes'),
+  ], 'Une ligne par caractéristique de pièce. Les regroupements (plusieurs emplacements ou machines par pièce) se font en mode expert.')
+  $('stgComplementsAssistant').onclick = assistant('stgComplements', 'Requête des compléments', [champ('codePiece', 'Code de la pièce', true), champ('stock', 'Stock'), champ('emplacement', 'Emplacement')], 'Une ligne par pièce ; ajoutez d’autres colonnes en mode expert.')
+  $('stgArbreAssistant').onclick = assistant('stgArbre', 'Requête de l’arborescence', [champ('noeud', 'Nœud', true, 'identifiant du nœud'), champ('parent', 'Parent', true, 'identifiant du nœud parent'), champ('code', 'Code', true, 'code de la machine'), champ('designation', 'Désignation'), champ('machine', 'Machine', false, 'identifiant de la machine'), champ('ordre', 'Ordre'), champ('arbre', 'Arborescence', false, 'nom de l’arborescence, s’il y en a plusieurs')], 'Une ligne par nœud de l’arborescence des machines.')
+  $('stgLiensAssistant').onclick = assistant('stgLiens', 'Requête des pièces montées', [champ('codePiece', 'Code de la pièce', true), champ('machine', 'Machine', true, 'identifiant de la machine')], 'Une ligne par pièce et par machine où elle est montée.')
   $('stgRequeteOk').onclick = () => enregistrerRequete(() => api('/api/requete', { methode: 'POST', corps: { sql: $('stgRequete').value } }))
   $('stgRptdesign').onchange = (e) => {
     const fichier = e.target.files[0]

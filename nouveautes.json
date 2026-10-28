@@ -1,6 +1,13 @@
 {
   "versions": [
     {
+      "version": "0.5.6",
+      "date": "2026-10-28",
+      "points": [
+        "Boutons « Assistant » pour les requêtes des pièces, des compléments et de l'arborescence (KTEC 0.6.1)"
+      ]
+    },
+    {
       "version": "0.5.5",
       "date": "2026-10-28",
       "points": [
