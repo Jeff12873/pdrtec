@@ -44,11 +44,25 @@ let cacheComplements = null // { sql, colonnes, lignes }
 
 const reglages = () => ({ ...REGLAGES_DEFAUT, ...lireInfo('pdrtec.reglages', {}) })
 
+// Réglages et SQL : réservés à l'administrateur (ctx.exigerModeAdmin, KTEC 0.6 et plus).
+const reserve = (r) => Object.fromEntries(['get', 'post', 'delete'].map((m) => [m, (chemin, action) => r[m](chemin, (ctx) => {
+  ctx.exigerModeAdmin?.()
+  return action(ctx)
+})]))
+
 export function routes(r) {
-  r.get('/api/reglages', () => ({ ...reglages(), requete: lireInfo('pdrtec.requete', ''), arborescence: lireInfo('pdrtec.arborescence', { arbre: '', liens: '' }), complements: lireInfo('pdrtec.complements', '') }))
+  const admin = reserve(r)
+  // Le SQL n'est montré qu'à l'administrateur ; les autres savent seulement s'il est réglé.
+  r.get('/api/reglages', (ctx) => {
+    const requete = lireInfo('pdrtec.requete', '')
+    const arborescence = lireInfo('pdrtec.arborescence', { arbre: '', liens: '' })
+    const complements = lireInfo('pdrtec.complements', '')
+    if (ctx.modeAdmin ?? true) return { ...reglages(), requete, arborescence, complements }
+    return { ...reglages(), requete: requete ? '(réglée)' : '', arborescence: { arbre: arborescence?.arbre ? '(réglée)' : '', liens: arborescence?.liens ? '(réglée)' : '' }, complements: complements ? '(réglée)' : '' }
+  })
 
   // La requête des compléments (vide : pas de compléments).
-  r.post('/api/complements/requete', async (ctx) => {
+  admin.post('/api/complements/requete', async (ctx) => {
     const { sql = '' } = await ctx.json()
     const propre = String(sql).trim().replace(/;\s*$/, '')
     if (propre && !/^(\s|--[^\n]*\n|\/\*[\s\S]*?\*\/)*(select|with)\b/i.test(propre)) throw new ErreurHttp(400, 'La requête doit être une lecture (SELECT).')
@@ -86,7 +100,7 @@ export function routes(r) {
   })
 
   // Les deux requêtes de l'arborescence (vides : pas de filtre par machine).
-  r.post('/api/arborescence/requetes', async (ctx) => {
+  admin.post('/api/arborescence/requetes', async (ctx) => {
     const { arbre = '', liens = '' } = await ctx.json()
     const propre = (sql) => String(sql || '').trim().replace(/;\s*$/, '')
     for (const sql of [arbre, liens].map(propre).filter(Boolean)) {
@@ -119,7 +133,7 @@ export function routes(r) {
     return { arbre: cacheArbo.arbre, liens: cacheArbo.liens, reglee: true }
   })
 
-  r.post('/api/reglages', async (ctx) => {
+  admin.post('/api/reglages', async (ctx) => {
     const changements = await ctx.json()
     const permis = Object.fromEntries(Object.entries(changements).filter(([cle]) => cle in REGLAGES_DEFAUT))
     ecrireInfo('pdrtec.reglages', { ...reglages(), ...permis })
@@ -127,14 +141,14 @@ export function routes(r) {
   })
 
   // La requête collée dans les paramètres.
-  r.post('/api/requete', async (ctx) => {
+  admin.post('/api/requete', async (ctx) => {
     const { sql } = await ctx.json()
     return enregistrerRequete(sql)
   })
 
   // La requête lue dans un rapport BIRT existant (.rptdesign envoyé tel quel) : le texte du premier jeu de données.
   // Le reste du fichier (connexion, mot de passe éventuel) n'est ni lu ni gardé.
-  r.post('/api/requete/rptdesign', async (ctx) => {
+  admin.post('/api/requete/rptdesign', async (ctx) => {
     const texte = (await ctx.octets()).toString('utf8')
     const trouve = texte.match(/<xml-property name="queryText"><!\[CDATA\[([\s\S]*?)\]\]><\/xml-property>/)
     if (!trouve) throw new ErreurHttp(400, 'Aucune requête trouvée dans ce fichier : est-ce bien un rapport BIRT (.rptdesign) ?')

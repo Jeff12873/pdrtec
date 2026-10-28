@@ -1,6 +1,13 @@
 {
   "versions": [
     {
+      "version": "0.5.5",
+      "date": "2026-10-28",
+      "points": [
+        "Paramètres et requêtes réservés à l'administrateur ; plus de mot de passe MySQL à saisir"
+      ]
+    },
+    {
       "version": "0.5.4",
       "date": "2026-10-25",
       "points": [

@@ -7,7 +7,6 @@
 
 import { api, adresse } from '/socle/api.js'
 import { etat } from '/socle/etat.js'
-import { demanderMotDePasse } from '/socle/connexion.js'
 import { notifier } from '/socle/ui.js'
 
 export default {
@@ -296,14 +295,12 @@ async function demarrer() {
 // Les données de la base (gardées par le serveur jusqu'au prochain « Actualiser »).
 async function chargerDepuisLaBase(rafraichir) {
   if (!requeteReglee) {
-    sourceAvecBouton('La requête qui lit les pièces dans la base n’est pas encore réglée.', 'Paramètres', ouvrirParametres)
+    if (etat.modeAdmin === false) $('source').textContent = 'La requête qui lit les pièces n’est pas encore réglée : c’est l’administrateur qui la renseigne.'
+    else sourceAvecBouton('La requête qui lit les pièces dans la base n’est pas encore réglée.', 'Paramètres', ouvrirParametres)
     return
   }
   if (!etat.connexion?.ouverte) {
-    sourceAvecBouton('Connexion MySQL fermée : connecte-toi pour lire les pièces, ou glisse un export Excel du rapport.', 'Se connecter', async () => {
-      await demanderMotDePasse()
-      if (etat.connexion?.ouverte) chargerDepuisLaBase(false)
-    })
+    sourceAvecBouton('Connexion à la GMAO indisponible : réessaie dans un moment, ou glisse un export Excel du rapport.', 'Réessayer', () => chargerDepuisLaBase(false))
     return
   }
   $('source').textContent = rafraichir ? 'Lecture de la base…' : 'Chargement des pièces…'
@@ -1433,6 +1430,8 @@ function brancherEvenements() {
   }
   $('help').onclick = () => $('notice').showModal()
   $('settingsBtn').onclick = ouvrirParametres
+  // Les paramètres sont réservés à l'administrateur (KTEC 0.6 et plus).
+  if (etat.modeAdmin === false) $('settingsBtn').hidden = true
   $('stgServer').oninput = () => { SETTINGS.serveur = $('stgServer').value.trim(); saveSettings(); render() }
   $('stgLien').oninput = () => { SETTINGS.modeleLien = $('stgLien').value.trim(); saveSettings(); render() }
   $('stgReversible').onchange = () => { SETTINGS.reversible = $('stgReversible').checked; rsel = { A: {}, B: {} }; saveSettings(); render() }
