@@ -5,5 +5,8 @@
   "sousTitre": "Recherche de pièces",
   "description": "Retrouver une pièce de rechange par ses caractéristiques, son emplacement, sa photo — en direct sur la base de la GMAO.",
   "icone": "interface/icone.svg",
-  "besoins": ["java"]
+  "besoins": [
+    "java"
+  ],
+  "eco": true
 }
