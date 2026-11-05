@@ -1,6 +1,13 @@
 {
   "versions": [
     {
+      "version": "0.6.1",
+      "date": "2026-11-05",
+      "points": [
+        "La version éco+ générique (sans réglages du site) est publiée avec chaque version : téléchargeable depuis la page de présentation de K.NOVA, sans rien installer"
+      ]
+    },
+    {
       "version": "0.6.0",
       "date": "2026-11-04",
       "points": [

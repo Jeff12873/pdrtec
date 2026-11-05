@@ -19,6 +19,7 @@ import { ErreurHttp, envoyerOctets } from 'ktec/http.js'
 import { lireInfo, ecrireInfo, lireFichier, enregistrerFichier } from 'ktec/ktec.js'
 import { executerRequete } from 'ktec/mysql.js'
 import { journal } from 'ktec/installation.js'
+import { fabriquerEco } from '../../eco/fabriquer.js'
 
 const REGLAGES_DEFAUT = {
   serveur: '',            // adresse du serveur de la GMAO (photos et pièces jointes), ex. 10.0.0.5
@@ -97,7 +98,7 @@ export function routes(r) {
   // La version éco+ : la recherche en un seul fichier HTML, pour les postes sans K.NOVA (exports Excel glissés sur
   // la page). Elle est fabriquée ici, avec les réglages du site et les images des choix écrits dedans.
   r.get('/api/eco', (ctx) => {
-    const html = fabriquerEco()
+    const html = ecoDuSite()
     envoyerOctets(ctx.res, Buffer.from(html, 'utf8'), { type: 'text/html; charset=utf-8', nom: `Recherche PDR eco+ ${versionPdrtec()}.html`, telecharger: true })
   })
 
@@ -215,28 +216,15 @@ const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 
 const versionPdrtec = () => { try { return fs.readFileSync(path.join(racine, 'VERSION'), 'utf8').trim() } catch { return '' } }
 const TYPES_IMAGES = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml' }
 
-function fabriquerEco() {
-  const lire = (f) => fs.readFileSync(path.join(racine, f))
+// La page éco+ avec les réglages du site ; les images des choix voyagent dans la page (data URL) : elle n'a pas
+// accès au fichier de connaissances.
+function ecoDuSite() {
   const r = reglages()
-  // Les images des choix voyagent dans la page (data URL) : elle n'a pas accès au fichier de connaissances.
   const images = {}
   for (const [cle, nom] of Object.entries(r.images || {})) {
     const octets = lireFichier('pdrtec-images', path.basename(String(nom)))
     const type = TYPES_IMAGES[path.extname(String(nom)).toLowerCase()]
     if (octets && type) images[cle] = `data:${type};base64,${Buffer.from(octets).toString('base64')}`
   }
-  const site = { le: new Date().toISOString(), reglages: { ...r, images } }
-  const sansFinDeScript = (texte) => texte.replace(/<\/script/gi, '<\\/script')
-  const remplacements = {
-    __VERSION__: versionPdrtec(),
-    __CSS__: lire('interface/app.css').toString('utf8'),
-    __XLSX__: sansFinDeScript(lire('interface/vendor/xlsx.full.min.js').toString('utf8')),
-    __MASQUE__: lire('interface/concombre-masque.webp').toString('base64'),
-    __PETIT__: lire('interface/concombre-petit.webp').toString('base64'),
-    __REGLAGES__: JSON.stringify(site).replace(/</g, '\\u003c'),
-    __APP__: sansFinDeScript(lire('eco/app.js').toString('utf8')),
-  }
-  let html = lire('eco/modele.html').toString('utf8')
-  for (const [cle, valeur] of Object.entries(remplacements)) html = html.split(cle).join(valeur)
-  return html
+  return fabriquerEco({ version: versionPdrtec(), site: { le: new Date().toISOString(), reglages: { ...r, images } } })
 }

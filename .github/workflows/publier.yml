@@ -35,12 +35,14 @@ jobs:
           mkdir -p dist/pdrtec
           cp -r app.json blocs eco interface VERSION package.json README.md nouveautes.json dist/pdrtec/
           (cd dist && zip -qr pdrtec.zip pdrtec)
+          # La page éco+ générique (sans réglages du site), téléchargeable depuis la page de présentation de K.NOVA
+          node eco/fabriquer.js "dist/Recherche-PDR-eco.html"
 
       - name: Release
         env:
           NOTES: ${{ github.event.head_commit.message }}
         run: |
-          gh release create "v$VERSION" dist/pdrtec.zip --title "PDRTec $VERSION" --notes "${NOTES:-Nouvelle version}"
+          gh release create "v$VERSION" dist/pdrtec.zip dist/Recherche-PDR-eco.html --title "PDRTec $VERSION" --notes "${NOTES:-Nouvelle version}"
           # On garde les 3 dernières versions
           gh release list --limit 100 --json tagName --jq '.[3:][].tagName' | while read -r ancienne; do
             gh release delete "$ancienne" --yes --cleanup-tag
