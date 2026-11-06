@@ -1,6 +1,13 @@
 {
   "versions": [
     {
+      "version": "0.6.2",
+      "date": "2026-11-06",
+      "points": [
+        "L'aide passe dans le wiki de K.NOVA : recherche, paramètres, éco+, cas d'usage, avec une maquette annotée de l'écran"
+      ]
+    },
+    {
       "version": "0.6.1",
       "date": "2026-11-05",
       "points": [

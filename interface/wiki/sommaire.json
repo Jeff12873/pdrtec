@@ -1,0 +1,55 @@
+{
+  "sections": [
+    {
+      "titre": "Chercher une pièce",
+      "pages": [
+        {
+          "id": "recherche",
+          "titre": "Rechercher une pièce",
+          "ecran": "recherche",
+          "mots": "code désignation famille filtre tension réversible photo",
+          "alias": [
+            "pdrtec"
+          ]
+        },
+        {
+          "id": "cas-usage",
+          "titre": "Cas d'usage",
+          "mots": "exemples scénarios"
+        }
+      ]
+    },
+    {
+      "titre": "Réglages",
+      "pages": [
+        {
+          "id": "parametres",
+          "titre": "Paramètres et requête",
+          "ecran": "recherche",
+          "admin": true,
+          "mots": "photos serveur familles proposées requête rapport birt"
+        }
+      ]
+    },
+    {
+      "titre": "Sans K.NOVA",
+      "pages": [
+        {
+          "id": "eco-plus",
+          "titre": "PDRTEC éco+",
+          "mots": "html seul excel export hors ligne"
+        }
+      ]
+    },
+    {
+      "titre": "Aide",
+      "pages": [
+        {
+          "id": "depannage",
+          "titre": "Questions fréquentes et astuces",
+          "mots": "erreur photo chèvre"
+        }
+      ]
+    }
+  ]
+}

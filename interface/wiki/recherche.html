@@ -1,0 +1,42 @@
+<h1>Rechercher une pièce</h1>
+<p class="but">Retrouver une pièce de rechange par son code, sa désignation, ses caractéristiques ou son emplacement, directement dans la base de la GMAO.</p>
+
+<script type="application/json" data-maquette>
+{ "titre": "PDRTEC — Recherche", "ratio": 54,
+  "blocs": [
+    [0,0,100,9,"","barre"],
+    [2,12,60,9,"Code, désignation, référence, \"REP 19\"…","champ"], [64,12,16,9,"Famille ▾","champ"], [82,12,16,9,"Sous-famille ▾","champ"],
+    [2,24,96,10,"Filtres des caractéristiques du modèle (diamètre, tension…)","zone"],
+    [2,37,62,58,"Tableau des pièces","zone"], [66,37,32,58,"Détail : photo, emplacement, machines, pièces jointes","carte"]
+  ],
+  "reperes": [
+    [4,16,"La recherche : plusieurs mots se combinent, les accents sont ignorés, une expression entre guillemets est cherchée telle quelle."],
+    [72,16,"Famille puis sous-famille : chaque liste ne propose que les valeurs encore possibles."],
+    [4,29,"Les caractéristiques du modèle de fiche deviennent des filtres et des colonnes."],
+    [4,42,"Les pièces trouvées ; une famille proposée (pas encore dans la GMAO) est en jaune."],
+    [68,42,"Clic sur une ligne : la photo, l'emplacement (« SUPPRIME » en rouge), les machines où elle est montée."]
+  ] }
+</script>
+
+<h2>Pas à pas</h2>
+<ol>
+<li>Tapez un ou plusieurs mots dans la barre : code, désignation, référence fabricant, observation.</li>
+<li>Affinez avec la famille puis la sous-famille.</li>
+<li>Utilisez les filtres des caractéristiques qui apparaissent (diamètre, filetage, tension…).</li>
+<li>Cliquez sur une ligne : photo, emplacement, machines, pièces jointes. L'icône à côté du code le copie.</li>
+</ol>
+
+<h2>Les familles proposées (en jaune)</h2>
+<p>Une pièce sans famille dans la GMAO reçoit une proposition, en jaune, apprise sur les pièces déjà classées. Survolez-la pour voir pourquoi. Elle n'est jamais écrite dans la GMAO : reportez-la si elle est juste.</p>
+
+<h2>Questions fréquentes</h2>
+<details><summary>Une chèvre remplace les photos</summary><p>Les photos ne s'affichent que depuis le réseau de l'entreprise.</p><p class="admin">Sinon, le serveur des photos ou le modèle de lien n'est pas réglé : voir <a href="#/pdrtec/parametres">Paramètres</a>.</p></details>
+<details><summary>Je ne trouve pas une pièce que je connais</summary><p>Essayez un seul mot, sans accent ni pluriel, ou le début du code. Retirez les filtres de famille : la pièce n'est peut-être pas classée.</p></details>
+<details><summary>Les données ne sont pas à jour</summary><p><b>Actualiser depuis la base</b> relit la GMAO.</p></details>
+
+<h2>Trucs et astuces</h2>
+<ul class="astuces">
+<li>Mettez une expression entre guillemets pour la chercher telle quelle : <code>"REP 19"</code>.</li>
+<li>Pour une pièce électrique, tapez la tension dans le champ dédié : PDRTEC garde les pièces dont la plage la couvre.</li>
+<li>Une pièce réversible (flexible…) est trouvée dans un sens comme dans l'autre.</li>
+</ul>

@@ -32,7 +32,7 @@ http://127.0.0.1:47700/pdrtec/.
 | Dossier | Contenu |
 |---|---|
 | `blocs/recherche/` | `serveur.js` (requête et réglages dans le .ktec, lecture de la base), `vue.js` (l'écran de recherche) |
-| `blocs/aide/` | Aide intégrée (pages dans `interface/aide/`) |
+| `blocs/aide/` | Renvoi vers le wiki de K.NOVA (pages dans `interface/wiki/`) |
 | `interface/` | Menu, styles (`app.css`, reliés au thème KTEC), icône, lecteur Excel embarqué (`vendor/`) |
 
 ## Composants tiers
